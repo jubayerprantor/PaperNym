@@ -13,9 +13,9 @@ Rules:
 
 ## Current state
 
-- **Current milestone:** Phase 3 Desktop UX & Workflow Integration complete
-- **Next task:** Phase 4 (Packaging & Platform Distribution) and Phase 5 (Community docs & release preparation)
-- **Last test run:** `.venv\Scripts\python.exe -m pytest -q` — 263 passed, 2 skipped (100% pass); `ruff check` and `ruff format` 100% clean
+- **Current milestone:** All 5 Phases Complete (Phases 1 through 5 fully implemented and verified)
+- **Next task:** Owner review, local trial run, commit and push to `jubayerprantor/PaperNym`
+- **Last test run:** `.venv\Scripts\python.exe -m pytest -q` — 267 passed, 2 skipped (100% pass); `ruff check` and `ruff format` 100% clean
 - **Open questions for the owner:** none
 
 ## Milestones
@@ -583,3 +583,18 @@ Newest entry at the bottom. Use this shape:
 - Tests: `ruff check` and `ruff format --check` pass (all 61 files formatted, 0 errors); `pytest -q` (263 passed, 2 skipped, 100% pass rate).
 - Decisions: Support dragging both individual PDF files and entire folders; keep drag-and-drop renaming guarded with an interactive confirmation dialog showing old -> new previews before executing; allow searching across all fields in history.
 - Next: Phase 4 (Packaging & Platform Distribution) and Phase 5 (Community Documentation & README).
+
+
+### 2026-11-14  Phase 4  Packaging & Platform Distribution: AppImage, Flatpak, Homebrew, macOS bundle, Explorer context menu
+- Done: Added Linux AppImage builder (`scripts/build_appimage.py`) with automatic `AppRun` routing between CLI and GUI modes; added Freedesktop Flatpak manifest (`packaging/io.github.jubayerprantor.PaperNym.yml`) and AppStream metadata (`packaging/io.github.jubayerprantor.PaperNym.metainfo.xml`); created Homebrew formula template (`Formula/papernym.rb`); added macOS application bundle generator (`scripts/build_macos.py`) producing `PaperNym.app` with `Info.plist` and `.dmg` packaging; added Windows File Explorer context menu integration (`scripts/install_context_menu.py` and `packaging/windows_context_menu.reg`) for right-click renaming and inspection under HKCU without admin elevation; updated `docs/BUILDING.md` with comprehensive multi-platform packaging and SignPath.io code-signing instructions.
+- Files: `scripts/build_appimage.py`, `scripts/build_macos.py`, `scripts/install_context_menu.py`, `packaging/windows_context_menu.reg`, `packaging/io.github.jubayerprantor.PaperNym.yml`, `packaging/io.github.jubayerprantor.PaperNym.metainfo.xml`, `Formula/papernym.rb`, `docs/BUILDING.md`, `tests/test_build_script.py`, `docs/PROGRESS.md`.
+- Tests: `ruff check` and `ruff format --check` pass (all 64 files formatted, 0 errors); `pytest -q` (267 passed, 2 skipped, 100% pass rate).
+- Decisions: Build portable AppDir structure that works across any Linux distribution without requiring root; provide both registry file and Python script for Windows context menu registration; configure SignPath open-source signing guidelines in documentation.
+- Next: Phase 5 (Community Health, Documentation & Open Source Hygiene).
+
+
+### 2026-11-14  Phase 5  Community Health, Documentation & Open Source Hygiene
+- Done: Added `.github/CONTRIBUTING.md` outlining development setup, virtualenv activation, test practices, and coding principles (zero Qt in `core/`); added `.github/CODE_OF_CONDUCT.md` (Contributor Covenant v2.1); added `.github/SECURITY.md` detailing supported versions and private vulnerability disclosure; added structured GitHub issue forms (`bug_report.yml`, `feature_request.yml`, `paper_misidentification.yml`, `config.yml`) and pull request template (`pull_request_template.md`); substantially enhanced `README.md` documenting Europe PMC integration, Drag-and-Drop quick renaming, BibTeX citation export, History table live filtering, Linux AppImage/Flatpak, macOS Homebrew, Windows Explorer context menu, and university proxy / custom CA certificate configuration (`HTTP_PROXY`, `HTTPS_PROXY`, `REQUESTS_CA_BUNDLE`).
+- Files: `.github/CONTRIBUTING.md`, `.github/CODE_OF_CONDUCT.md`, `.github/SECURITY.md`, `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/feature_request.yml`, `.github/ISSUE_TEMPLATE/paper_misidentification.yml`, `.github/ISSUE_TEMPLATE/config.yml`, `.github/pull_request_template.md`, `README.md`, `docs/PROGRESS.md`.
+- Tests: `ruff check` and `ruff format --check` pass (all 64 files formatted, 0 errors); `pytest -q` (267 passed, 2 skipped, 100% pass rate).
+- Next: Fork owner review and git commit.

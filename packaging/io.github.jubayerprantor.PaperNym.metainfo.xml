@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jubayerprantor.PaperNym</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>PaperNym</name>
+  <summary>Academic PDF renamer with scholarly metadata resolution</summary>
+  <description>
+    <p>
+      PaperNym is a desktop background utility and command-line tool that extracts DOIs,
+      arXiv IDs, PMIDs, and titles from research PDFs, queries scholarly metadata APIs
+      (Crossref, OpenAlex, Semantic Scholar, Europe PMC, arXiv), and safely renames files
+      according to customizable naming presets.
+    </p>
+    <p>
+      Key features include live download folder monitoring, drag-and-drop instant renaming,
+      BibTeX citation export, collision prevention, and completely local SQLite history tracking.
+    </p>
+  </description>
+  <launchable type="desktop-id">papernym.desktop</launchable>
+  <url type="homepage">https://github.com/jubayerprantor/PaperNym</url>
+  <url type="bugtracker">https://github.com/jubayerprantor/PaperNym/issues</url>
+  <developer id="io.github.jubayerprantor">
+    <name>Jubayer Prantor</name>
+  </developer>
+  <provides>
+    <binary>papernym</binary>
+    <binary>papernym-gui</binary>
+    <mediatype>application/pdf</mediatype>
+  </provides>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.4" date="2026-11-14">
+      <description>
+        <p>Added Europe PMC provider, scanned PDF detection, drag-and-drop PDF renaming, and BibTeX citation export.</p>
+      </description>
+    </release>
+  </releases>
+</component>

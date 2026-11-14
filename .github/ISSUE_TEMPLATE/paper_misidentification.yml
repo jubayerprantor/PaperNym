@@ -1,0 +1,36 @@
+name: Paper Misidentification Report
+description: Report a scientific paper where PaperNym extracted the wrong DOI, title, or authors
+labels: ["identification", "accuracy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when PaperNym failed to identify or misidentified a public scientific paper.
+  - type: input
+    id: paper_url
+    attributes:
+      label: Paper Link or Publisher URL
+      description: Link to the paper on publisher, arXiv, PubMed, or open access repository.
+      placeholder: https://doi.org/10.xxxx/yyyy or https://arxiv.org/abs/xxxx.yyyy
+    validations:
+      required: true
+  - type: input
+    id: expected_title
+    attributes:
+      label: Expected Title & Authors
+      placeholder: "e.g. Attention Is All You Need (Vaswani et al., 2017)"
+    validations:
+      required: true
+  - type: textarea
+    id: papernym_output
+    attributes:
+      label: What did PaperNym name the file or detect?
+      description: Paste the output of `papernym show path/to/paper.pdf`.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional Context
+      description: Was the PDF scanned, multi-column, or did it have unusual headers?

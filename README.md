@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Xatta-Trone/PaperNym/main/assets/papernym-icon-1024.png" alt="PaperNym icon" width="112">
+  <img src="https://raw.githubusercontent.com/jubayerprantor/PaperNym/main/assets/papernym-icon-1024.png" alt="PaperNym icon" width="112">
 </p>
 
 <h1 align="center">PaperNym</h1>
@@ -15,10 +15,10 @@
 
 <p align="center">
   <a href="https://pypi.org/project/papernym/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/papernym?logo=pypi&logoColor=white&color=0B5563"></a>
-  <a href="https://github.com/Xatta-Trone/PaperNym/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Xatta-Trone/PaperNym?label=release&logo=github&color=0B5563"></a>
+  <a href="https://github.com/jubayerprantor/PaperNym/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/jubayerprantor/PaperNym?label=release&logo=github&color=0B5563"></a>
   <a href="https://pypistats.org/packages/papernym"><img alt="PyPI downloads" src="https://img.shields.io/pypi/dm/papernym?label=downloads&logo=pypi&logoColor=white&color=0B5563"></a>
-  <a href="https://github.com/Xatta-Trone/PaperNym/releases"><img alt="GitHub downloads" src="https://img.shields.io/github/downloads/Xatta-Trone/PaperNym/total?label=downloads&logo=github&color=0B5563"></a>
-  <a href="https://github.com/Xatta-Trone/PaperNym/blob/main/LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-0B5563"></a>
+  <a href="https://github.com/jubayerprantor/PaperNym/releases"><img alt="GitHub downloads" src="https://img.shields.io/github/downloads/jubayerprantor/PaperNym/total?label=downloads&logo=github&color=0B5563"></a>
+  <a href="https://github.com/jubayerprantor/PaperNym/blob/main/LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-0B5563"></a>
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0B5563">
   <img alt="Ubuntu 22.04 and newer" src="https://img.shields.io/badge/Ubuntu-22.04%2B-0B5563">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-FFB020">
@@ -55,8 +55,17 @@ and gives the file a name you can read, sort and search.
 
 - **Hands-off.** Lives in the system tray and renames new PDFs as soon as they land in a
   watched folder, such as Downloads or your papers folder.
-- **Accurate.** Uses Crossref, doi.org, OpenAlex, Semantic Scholar and arXiv, and verifies
-  every result against the PDF's own text. A file is left alone rather than given a wrong name.
+- **Drag-and-Drop quick renamer.** Drag one or more PDFs or entire directories onto the PaperNym
+  window for instant renaming preview and confirmation without having to move them to watched folders.
+- **Accurate scholarly identification.** Resolves metadata from Crossref, doi.org, OpenAlex,
+  Semantic Scholar, Europe PMC, PubMed (PMID/PMCID), and arXiv, and verifies every result
+  against the PDF's own text.
+- **Scanned PDF detection.** Detects image-only/scanned papers without text layers and flags them
+  gracefully (`scanned`), saving unnecessary API calls and guiding OCR steps.
+- **BibTeX citation quick copy.** One-click "Copy BibTeX" button and context menu in both
+  Activity and History tables for seamless workflow with LaTeX, Overleaf, and reference managers.
+- **History search & live status filter.** Instant search bar and status filter dropdown
+  (Renamed, Manual Fix, Needs Check, Failed) across original names, renamed paths, and titles.
 - **Works offline.** When no service can be reached, papers are named from the PDF alone,
   marked `_CHECK`, and fixed automatically once the services are back.
 - **Your names win.** A file you rename by hand is never renamed again.
@@ -67,8 +76,8 @@ and gives the file a name you can read, sort and search.
 - **Preview first.** Dry runs show `old -> new` with checkboxes before anything is renamed.
 - **Each paper is looked up once.** Lookups are cached, and copies of a known paper are named
   without a web call.
-- **Tray app and command line.** One install gives you both, sharing the same settings and
-  history.
+- **Tray app, command line, and Explorer menu.** Includes desktop GUI, CLI, and optional
+  Windows Explorer right-click context menu integration.
 - **Light and dark themes**, a keyboard-friendly interface, batched notifications, and
   Start at login.
 
@@ -77,7 +86,7 @@ and gives the file a name you can read, sort and search.
 ### Windows (recommended)
 
 1. Download `PaperNym-Setup-<version>.exe` from the
-   [latest release](https://github.com/Xatta-Trone/PaperNym/releases/latest).
+   [latest release](https://github.com/jubayerprantor/PaperNym/releases/latest).
 2. Run it. It installs for your user account only (no administrator rights) into
    `%LOCALAPPDATA%\Programs\PaperNym`.
 3. PaperNym opens and walks you through choosing folders and a name format.
@@ -91,30 +100,50 @@ The installer always includes the command line. It adds `papernym` to your user 
 (open a new terminal afterwards) and registers both programs with Windows. You can also
 choose **Start PaperNym when I log in** and a desktop shortcut.
 
+#### Windows Explorer Context Menu
+To add "Rename with PaperNym" directly to the right-click menu for `.pdf` files and folders:
+```bat
+python scripts\install_context_menu.py --install
+```
+*(Or double-click `packaging\windows_context_menu.reg` to register keys under `HKCU` without admin privileges).*
+
 Requirements: Windows 10 or 11 (64-bit) and an internet connection for lookups.
 
-### Ubuntu and Debian
+### Linux (Ubuntu, Debian, Fedora, Arch, openSUSE)
 
+#### Debian and Ubuntu (.deb)
 1. Download `papernym_<version>_amd64.deb` from the
-   [latest release](https://github.com/Xatta-Trone/PaperNym/releases/latest).
-2. Install it; `apt` also installs the few system libraries Qt needs:
-
+   [latest release](https://github.com/jubayerprantor/PaperNym/releases/latest).
+2. Install it:
    ```bash
    sudo apt install ./papernym_<version>_amd64.deb
    ```
+3. Open **PaperNym** from the app menu (or run `papernym-gui`). The command line is `papernym`.
 
-3. Open **PaperNym** from the app menu (or run `papernym-gui`). The command line is
-   `papernym`.
+#### Universal Linux (AppImage)
+For Fedora, Arch Linux, openSUSE, or non-Debian distributions:
+1. Download `PaperNym-<version>-x86_64.AppImage` from Releases.
+2. Make it executable:
+   ```bash
+   chmod +x PaperNym-*-x86_64.AppImage
+   ./PaperNym-*-x86_64.AppImage
+   ```
 
-The package installs into `/opt/papernym` and needs Ubuntu 22.04 or newer, or Debian 12 or
-newer (64-bit). No Python is required.
+#### Flatpak
+Build and install via Flatpak manifest:
+```bash
+flatpak-builder --user --install --force-clean build-dir packaging/io.github.jubayerprantor.PaperNym.yml
+```
 
-The tray icon appears on Ubuntu, KDE and most other desktops. Stock GNOME on some other
-distributions hides tray icons unless the
-[AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/)
-is installed; without a tray, PaperNym keeps its window open and closing it quits.
+### macOS
 
-### With pip (Python 3.10+)
+#### Via Homebrew
+```bash
+brew tap jubayerprantor/papernym
+brew install papernym
+```
+
+#### Via pipx / pip (Python 3.10+)
 
 PaperNym is on [PyPI](https://pypi.org/project/papernym/):
 
@@ -311,12 +340,28 @@ computer are:
 
 | Sent | To | When |
 |---|---|---|
-| DOIs and arXiv IDs found in your PDFs | Crossref, doi.org, OpenAlex, Semantic Scholar, arXiv | Every lookup |
-| Paper titles | Crossref, OpenAlex, Semantic Scholar | Only while **Search by title** is on (`papernym set-title-search off` to stop) |
+| DOIs, arXiv IDs, PMIDs found in your PDFs | Crossref, doi.org, OpenAlex, Semantic Scholar, Europe PMC, arXiv | Every lookup |
+| Paper titles | Crossref, OpenAlex, Semantic Scholar, Europe PMC | Only while **Search by title** is on (`papernym set-title-search off` to stop) |
 | Your email address | Crossref, as its "polite pool" contact | Only if you set one |
 | Version number | GitHub, to check for a newer release | Once a day; can be turned off under About |
 
 File contents and file names are never sent.
+
+## Proxies and University Networks
+
+If you are using PaperNym behind an academic firewall, campus proxy, or VPN:
+
+1. **HTTP/HTTPS Proxies:**
+   PaperNym automatically honors standard proxy environment variables:
+   ```bash
+   export HTTP_PROXY="http://proxy.university.edu:8080"
+   export HTTPS_PROXY="http://proxy.university.edu:8080"
+   ```
+2. **Custom Root Certificates (SSL Inspection):**
+   If your institution performs TLS inspection with a custom root certificate, point `REQUESTS_CA_BUNDLE` or `SSL_CERT_FILE` to your trusted `.pem` or `.crt` certificate bundle:
+   ```bash
+   export REQUESTS_CA_BUNDLE="/path/to/university-ca-certificates.crt"
+   ```
 
 ## API keys
 
@@ -326,6 +371,7 @@ All keys are optional. PaperNym works without any.
 |---|---|---|
 | OpenAlex | Adds OpenAlex as a source; it is skipped without a key | [openalex.org/settings/api](https://openalex.org/settings/api) (free) |
 | Semantic Scholar | Avoids the shared rate limit of keyless calls | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
+| Europe PMC | Free open access scholarly database (no key needed) | [europepmc.org](https://europepmc.org) |
 
 Add them on the **Sources** tab, or from the command line:
 
@@ -402,52 +448,39 @@ Settings stay in the folder shown by `papernym show` (Windows: `%APPDATA%\PaperN
 and macOS: `~/.config/PaperNym`); delete it by hand if you no longer need them. Your PDFs are never
 touched.
 
-## Development
+## Development and Contributing
 
 ```bash
-git clone https://github.com/Xatta-Trone/PaperNym.git
+git clone https://github.com/jubayerprantor/PaperNym.git
 cd papernym
 python -m venv .venv
 .venv\Scripts\activate                    # Linux and macOS: source .venv/bin/activate
-pip install -e ".[gui,dev]"
+pip install -e ".[gui,dev,build]"
 python -m pytest -q
 papernym-gui --sandbox --show --debug     # run the tray app from source
 ```
 
-- [`docs/SPEC.md`](https://github.com/Xatta-Trone/PaperNym/blob/main/docs/SPEC.md) is the full specification: behaviour, naming rules, edge cases.
-- [`docs/BUILDING.md`](https://github.com/Xatta-Trone/PaperNym/blob/main/docs/BUILDING.md) covers building the Windows exe and installer, and releasing.
-- [`docs/PROGRESS.md`](https://github.com/Xatta-Trone/PaperNym/blob/main/docs/PROGRESS.md) is the work log and milestone checklist.
+- [Contributing Guidelines](.github/CONTRIBUTING.md) details development setup, coding rules, and testing standards.
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md) outlines our community standards.
+- [Security Policy](.github/SECURITY.md) for reporting vulnerabilities.
+- [`docs/SPEC.md`](docs/SPEC.md) is the full specification: behaviour, naming rules, edge cases.
+- [`docs/BUILDING.md`](docs/BUILDING.md) covers packaging (Windows, Linux .deb/AppImage/Flatpak, macOS .app/Homebrew).
+- [`docs/PROGRESS.md`](docs/PROGRESS.md) is the work log and milestone checklist.
 
 Bug reports and ideas are welcome in
-[Issues](https://github.com/Xatta-Trone/PaperNym/issues). For a misnamed paper, include its
-DOI and the output of `papernym compare` on that file, if you can.
-
-## Roadmap
-
-Done:
-
-- Windows tray app, command line and installer
-- PyPI package (`pip install papernym` / `pipx install papernym`)
-- Ubuntu and Debian `.deb` package
-- macOS through pip, with a menu-bar app and an `~/Applications` launcher
-
-Planned:
-
-- Code-signed Windows releases
-- A Mac app (`.dmg`) once the pip version has been tried on real Macs
-- Packages for other Linux distributions (Flatpak or AppImage)
-
-What changed in each version is in the
-[changelog](https://github.com/Xatta-Trone/PaperNym/blob/main/CHANGELOG.md).
+[Issues](https://github.com/jubayerprantor/PaperNym/issues). For a misnamed paper, include its
+DOI and the output of `papernym compare` on that file.
 
 ## Licence and credits
 
-PaperNym is released under the [MIT licence](https://github.com/Xatta-Trone/PaperNym/blob/main/LICENSE) © 2026
-[Xatta-Trone](https://github.com/Xatta-Trone). The Windows build bundles Qt for Python
+PaperNym is released under the [MIT licence](LICENSE) © 2026. The Windows build bundles Qt for Python
 (PySide6, LGPL-3.0), linked dynamically. Licences of all bundled components ship in
 `THIRD_PARTY_LICENSES.txt`.
 
 Metadata is provided by [Crossref](https://www.crossref.org),
 [DOI.org](https://www.doi.org), [OpenAlex](https://openalex.org),
+[Semantic Scholar](https://www.semanticscholar.org),
+[Europe PMC / PubMed](https://europepmc.org), and [arXiv](https://arxiv.org).
+Thank you to these services for keeping scholarly metadata open.
 [Semantic Scholar](https://www.semanticscholar.org) and [arXiv](https://arxiv.org).
 Thank you to these services for keeping scholarly metadata open.

@@ -95,9 +95,10 @@ builds the artifact.
 Bump `src/papernym/__init__.py` before tagging. The app's update check reads the latest
 release of `Xatta-Trone/PaperNym`.
 
-## Linux package
+## Linux packages
 
-`scripts/build_linux.py` builds the same one-folder app with PyInstaller (shared
+### Debian / Ubuntu (.deb)
+`scripts/build_linux.py` builds the one-folder app with PyInstaller (shared
 `packaging/papernym.spec`), smoke-tests both programs, then packs a `.deb` with `dpkg-deb`:
 
 | In the package | What it is |
@@ -110,33 +111,60 @@ release of `Xatta-Trone/PaperNym`.
 The package depends on the system libraries Qt's X11/Wayland plugins load (`libxcb-cursor0`,
 `libegl1` and so on), so `apt install ./papernym_*.deb` pulls them in.
 
-Build on Ubuntu 22.04 (the oldest supported release; newer glibc versions run older builds,
-not the other way round):
+### Universal Linux AppImage
+To build a standalone `.AppImage` executable that runs on Fedora, Arch Linux, openSUSE, and other distributions:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[gui,dev,build]"
-python scripts/build_linux.py --snapshot     # dist/papernym_<version>+git<date>.<sha>_amd64.deb
+python scripts/build_appimage.py               # dist/PaperNym-<version>-x86_64.AppImage
+python scripts/build_appimage.py --appdir-only # prepares build/AppDir structure
 ```
 
-`--snapshot` marks test builds; release builds use `--expected-version vX.Y.Z` instead.
-`.github/workflows/linux-release.yml` runs the tests, builds on `ubuntu-22.04`, installs the
-`.deb`, runs both programs, removes it again, and then uploads the artifact (and attaches it
-to the release for a tag). "Run workflow" without a tag gives a snapshot artifact to try.
+### Flatpak
+A manifest is provided in `packaging/io.github.jubayerprantor.PaperNym.yml` alongside AppStream metainfo `packaging/io.github.jubayerprantor.PaperNym.metainfo.xml`:
 
-## Code signing (not used for now)
+```bash
+flatpak-builder --user --install --force-clean build-dir packaging/io.github.jubayerprantor.PaperNym.yml
+```
 
-Releases are unsigned. Users see SmartScreen's "Windows protected your PC" on the installer
+## macOS Distribution
+
+### Homebrew
+A formula template is located at `Formula/papernym.rb`. Researchers can install PaperNym via Homebrew:
+
+```bash
+brew tap jubayerprantor/papernym
+brew install papernym
+```
+
+### macOS Application Bundle (.app and .dmg)
+Build a native macOS application bundle and `.dmg` installer:
+
+```bash
+python scripts/build_macos.py               # dist/PaperNym.app and dist/PaperNym-<version>-macos.dmg
+python scripts/build_macos.py --app-only    # dist/PaperNym.app bundle only
+```
+
+## Windows Context Menu Integration
+
+Add right-click "Rename with PaperNym" and "Inspect with PaperNym" shortcuts to Windows File Explorer (Current User only, no admin needed):
+
+```bat
+python scripts\install_context_menu.py --install
+python scripts\install_context_menu.py --status
+python scripts\install_context_menu.py --uninstall
+```
+
+Alternatively, double-click `packaging\windows_context_menu.reg` to apply registry entries directly.
+
+## Code signing
+
+Releases are unsigned by default. Users see SmartScreen's "Windows protected your PC" on the installer
 and choose **More info > Run anyway**; the warning fades as a release gains downloads.
-Microsoft Defender's behaviour detection can also flag a new unsigned exe that registers
-itself at login: in the local trial, a copy installed under `%TEMP%` was blocked as
-`Behavior:Win32/Persistence.A!ml`. If a release is flagged, report it as a false positive at
-https://www.microsoft.com/wdsi/filesubmission.
 
-To sign later: `scripts/build_windows.py` still signs both exes and the installer when
-`SIGN_PFX` (a `.pfx`) and `SIGN_PASSWORD` are set and `signtool.exe` is available. The release
-workflow does not pass a certificate. SignPath.io (free for open-source projects) and Azure
-Trusted Signing are the low-cost routes.
+To sign binaries:
+1. **Local / Self-Hosted:** Set `SIGN_PFX` (path to a `.pfx`) and `SIGN_PASSWORD`; `signtool.exe` must be on `PATH` or in `SIGNTOOL`. `scripts/build_windows.py` will sign both executables and the installer.
+2. **Automated CI (SignPath.io):** Free code signing certificates are available for open-source projects via SignPath Foundation. Configure the `SignPath/github-action-submit-signing-request` action in `windows-release.yml` with your organization slug and project slug.
+
 
 ## Publishing to PyPI
 
