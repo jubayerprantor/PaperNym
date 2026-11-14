@@ -4,16 +4,21 @@ from pathlib import Path
 
 import pytest
 
+from papernym.core import engine as engine_module
 from papernym.core.config import default_config
 from papernym.core.db import Database
-from papernym.core import engine as engine_module
 from papernym.core.engine import Engine, move_no_replace
 from papernym.core.identify import IdentifyOutcome, LookupStats, PaperMatch
 from papernym.core.pdfread import PdfReadError
 
-
-META = {"title": "A useful research article", "year": 2025, "year_online": 2024,
-        "authors": ["Smith"], "journal": "Journal", "source": "crossref"}
+META = {
+    "title": "A useful research article",
+    "year": 2025,
+    "year_online": 2024,
+    "authors": ["Smith"],
+    "journal": "Journal",
+    "source": "crossref",
+}
 
 
 class FakeIdentifier:
@@ -41,9 +46,14 @@ def outcome(status="ok", meta=None):
 
 
 def engine(db, identifier, events=None, read=None, stable=None):
-    return Engine(default_config(), db, identifier, (events if events is not None else []).append,
-                  read_pdf_fn=read or (lambda _: {"text": "paper"}),
-                  stable_fn=stable or (lambda _: True))
+    return Engine(
+        default_config(),
+        db,
+        identifier,
+        (events if events is not None else []).append,
+        read_pdf_fn=read or (lambda _: {"text": "paper"}),
+        stable_fn=stable or (lambda _: True),
+    )
 
 
 def test_identified_file_is_renamed_and_recorded_once(tmp_path):
@@ -87,6 +97,20 @@ def test_check_unknown_and_unreadable_statuses(tmp_path):
         bad_engine = engine(db, FakeIdentifier(outcome()), read=unreadable)
         assert bad_engine.process(bad_path).status == "unreadable"
         assert bad_engine.process(bad_path, retry=True).status == "skipped"
+
+        scanned_path = tmp_path / "scanned.pdf"
+        scanned_path.write_bytes(b"SCANNED_PDF_BYTES")
+        events = []
+        scan_engine = engine(
+            db,
+            FakeIdentifier(IdentifyOutcome(None, "scanned", 0, LookupStats())),
+            events=events,
+        )
+        res = scan_engine.process(scanned_path)
+        assert res.status == "scanned"
+        assert "OCR needed" in res.message
+        assert any(e["type"] == "unidentified" and "OCR needed" in e["message"] for e in events)
+        assert scan_engine.process(scanned_path, retry=True).status == "skipped"
 
 
 def test_locked_rename_becomes_pending_and_retries_without_lookup(tmp_path, monkeypatch):
@@ -179,8 +203,7 @@ def test_annotated_file_and_copy_need_no_new_lookup(tmp_path):
 def test_excludes_file_globs_and_folder_names_before_reading(tmp_path):
     manuscript_dir = tmp_path / "Manuscripts"
     manuscript_dir.mkdir()
-    paths = [tmp_path / "rough_draft.pdf", tmp_path / "paper_v2.pdf",
-             manuscript_dir / "final.pdf"]
+    paths = [tmp_path / "rough_draft.pdf", tmp_path / "paper_v2.pdf", manuscript_dir / "final.pdf"]
     for path in paths:
         path.write_bytes(b"PDF")
 
@@ -205,11 +228,19 @@ def test_scan_emits_progress_and_prunes_only_reachable_folders(tmp_path):
     offline_file.write_bytes(b"three")
     events = []
     config = default_config()
-    config["folders"] = [{"path": str(live), "recursive": True},
-                         {"path": str(offline), "recursive": True}]
+    config["folders"] = [
+        {"path": str(live), "recursive": True},
+        {"path": str(offline), "recursive": True},
+    ]
     with Database(tmp_path / "home") as db:
-        worker = Engine(config, db, FakeIdentifier(outcome()), events.append,
-                        read_pdf_fn=lambda _: {"text": "paper"}, stable_fn=lambda _: True)
+        worker = Engine(
+            config,
+            db,
+            FakeIdentifier(outcome()),
+            events.append,
+            read_pdf_fn=lambda _: {"text": "paper"},
+            stable_fn=lambda _: True,
+        )
         first = worker.scan()
         assert first["total"] == 3
         assert [event["type"] for event in events].count("scan_progress") == 3
@@ -237,8 +268,14 @@ def test_dry_scan_reserves_names_without_writing_files_or_database(tmp_path):
     cfg = default_config()
     cfg["folders"] = [{"path": str(papers), "recursive": True}]
     with Database(tmp_path / "home") as db:
-        worker = Engine(cfg, db, FakeIdentifier(outcome()), events.append,
-                        read_pdf_fn=lambda _: {"text": "paper"}, stable_fn=lambda _: True)
+        worker = Engine(
+            cfg,
+            db,
+            FakeIdentifier(outcome()),
+            events.append,
+            read_pdf_fn=lambda _: {"text": "paper"},
+            stable_fn=lambda _: True,
+        )
         counts = worker.scan(dry_run=True)
         assert counts["preview"] == 2
         targets = [event["new_path"] for event in events if event["type"] == "preview"]
@@ -312,8 +349,9 @@ def test_undo_latest_batch_and_last_n(tmp_path):
     cfg = default_config()
     cfg["folders"] = [{"path": str(papers), "recursive": True}]
     with Database(tmp_path / "home") as db:
-        worker = Engine(cfg, db, FakeIdentifier(outcome()), read_pdf_fn=lambda _: {},
-                        stable_fn=lambda _: True)
+        worker = Engine(
+            cfg, db, FakeIdentifier(outcome()), read_pdf_fn=lambda _: {}, stable_fn=lambda _: True
+        )
         assert worker.scan()["ok"] == 2
         assert worker.undo() == {"undone": 2, "skipped": 0}
         assert (papers / "one.pdf").exists() and (papers / "two.pdf").exists()

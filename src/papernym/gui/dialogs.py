@@ -3,10 +3,25 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QPushButton, QSpinBox, QTreeWidget,
-                               QTreeWidgetItem, QVBoxLayout, QWizard, QWizardPage)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QSpinBox,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWizard,
+    QWizardPage,
+)
 
 from ..core.naming import PRESETS, build_name
 from .common import SAMPLE_PAPERS, LinkLabel, short
@@ -17,9 +32,18 @@ class PreviewDialog(QDialog):
 
     include_manual_changed = Signal(bool)
 
-    def __init__(self, title: str, intro: str, items: list[dict], *, checkable: bool = True,
-                 accept_text: str = "Rename", reject_text: str = "Cancel",
-                 include_manual: bool | None = None, parent=None):
+    def __init__(
+        self,
+        title: str,
+        intro: str,
+        items: list[dict],
+        *,
+        checkable: bool = True,
+        accept_text: str = "Rename",
+        reject_text: str = "Cancel",
+        include_manual: bool | None = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.resize(900, 480)
@@ -38,7 +62,9 @@ class PreviewDialog(QDialog):
             self.manual_box = QCheckBox("Also rename files I renamed by &hand")
             self.manual_box.setChecked(include_manual)
             self.manual_box.toggled.connect(self.include_manual_changed)
-            layout.addWidget(QLabel("Files you renamed by hand are left alone unless you tick this."))
+            layout.addWidget(
+                QLabel("Files you renamed by hand are left alone unless you tick this.")
+            )
             layout.addWidget(self.manual_box)
         row = QHBoxLayout()
         if checkable:
@@ -131,15 +157,24 @@ class DetailsDialog(QDialog):
         self.accept()
 
     def values(self) -> dict:
-        return {"title": self.title.text().strip(), "author": self.author.text().strip() or None,
-                "year": self.year.value() or None}
+        return {
+            "title": self.title.text().strip(),
+            "author": self.author.text().strip() or None,
+            "year": self.year.value() or None,
+        }
 
 
 class WelcomeWizard(QWizard):
     """First run: (1) folders, (2) name format with preview, (3) optional OpenAlex key."""
 
-    def __init__(self, folders: list[str], parent=None, *, allow_login: bool = True,
-                 login_default: bool = True):
+    def __init__(
+        self,
+        folders: list[str],
+        parent=None,
+        *,
+        allow_login: bool = True,
+        login_default: bool = True,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Welcome to PaperNym")
         self.setWizardStyle(QWizard.ModernStyle)
@@ -147,8 +182,10 @@ class WelcomeWizard(QWizard):
 
         folders_page = QWizardPage()
         folders_page.setTitle("1. Choose folders")
-        folders_page.setSubTitle("PaperNym watches these folders (and their subfolders) and renames "
-                                 "new paper PDFs. You will see a preview before anything is renamed.")
+        folders_page.setSubTitle(
+            "PaperNym watches these folders (and their subfolders) and renames "
+            "new paper PDFs. You will see a preview before anything is renamed."
+        )
         layout = QVBoxLayout(folders_page)
         self.folder_list = QListWidget()
         self.folder_list.setAccessibleName("Folders to watch")
@@ -159,8 +196,12 @@ class WelcomeWizard(QWizard):
         add = QPushButton("&Add folder...")
         remove = QPushButton("&Remove")
         add.clicked.connect(self._add_folder)
-        remove.clicked.connect(lambda: [self.folder_list.takeItem(self.folder_list.row(item))
-                                        for item in self.folder_list.selectedItems()])
+        remove.clicked.connect(
+            lambda: [
+                self.folder_list.takeItem(self.folder_list.row(item))
+                for item in self.folder_list.selectedItems()
+            ]
+        )
         row.addWidget(add)
         row.addWidget(remove)
         row.addStretch(1)
@@ -186,9 +227,11 @@ class WelcomeWizard(QWizard):
 
         key_page = QWizardPage()
         key_page.setTitle("3. OpenAlex key (optional)")
-        key_page.setSubTitle("A free OpenAlex key adds a second source for lookups. PaperNym works "
-                             "without it. The key is kept in your system's credential store "
-                             "(Windows Credential Manager on Windows).")
+        key_page.setSubTitle(
+            "A free OpenAlex key adds a second source for lookups. PaperNym works "
+            "without it. The key is kept in your system's credential store "
+            "(Windows Credential Manager on Windows)."
+        )
         layout = QFormLayout(key_page)
         self.key = QLineEdit()
         layout.addRow("OpenAlex &key", self.key)

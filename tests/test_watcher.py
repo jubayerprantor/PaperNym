@@ -1,7 +1,6 @@
 from watchdog.events import FileCreatedEvent, FileMovedEvent
 
-from papernym.core.config import default_config
-from papernym.core.config import save_config
+from papernym.core.config import default_config, save_config
 from papernym.core.db import Database
 from papernym.core.engine import Engine
 from papernym.core.lock import WriterLock
@@ -43,8 +42,14 @@ def test_startup_scan_and_created_moved_events(tmp_path):
     observer = FakeObserver()
     events = []
     with Database(tmp_path / "home") as db:
-        engine = Engine(cfg, db, FakeIdentifier(outcome()), events.append,
-                        read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        engine = Engine(
+            cfg,
+            db,
+            FakeIdentifier(outcome()),
+            events.append,
+            read_pdf_fn=lambda _: {},
+            stable_fn=lambda _: True,
+        )
         watcher = Watcher(engine, observer=observer)
         watcher.start()
         assert observer.running
@@ -81,8 +86,14 @@ def test_settings_reload_reconciles_folders(tmp_path):
     events = []
     observer = FakeObserver()
     with Database(home) as db:
-        engine = Engine(cfg, db, FakeIdentifier(outcome()), events.append,
-                        read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        engine = Engine(
+            cfg,
+            db,
+            FakeIdentifier(outcome()),
+            events.append,
+            read_pdf_fn=lambda _: {},
+            stable_fn=lambda _: True,
+        )
         watcher = Watcher(engine, observer=observer, clock=lambda: 0)
         watcher.start()
         changed = dict(cfg, folders=[{"path": str(second), "recursive": True}])
@@ -106,7 +117,9 @@ def test_pause_drops_events_and_resume_scans(tmp_path):
     home = tmp_path / "home"
     save_config(cfg, home)
     with Database(home) as db:
-        engine = Engine(cfg, db, FakeIdentifier(outcome()), read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        engine = Engine(
+            cfg, db, FakeIdentifier(outcome()), read_pdf_fn=lambda _: {}, stable_fn=lambda _: True
+        )
         watcher = Watcher(engine, observer=FakeObserver(), clock=lambda: 0)
         watcher.start()
         watcher.handler.on_created(FileCreatedEvent(str(pending)))
@@ -130,7 +143,9 @@ def test_unplugged_folder_returns_and_retry_timer(tmp_path):
     events = []
     observer = FakeObserver()
     with Database(tmp_path / "home") as db:
-        engine = Engine(cfg, db, fake, events.append, read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        engine = Engine(
+            cfg, db, fake, events.append, read_pdf_fn=lambda _: {}, stable_fn=lambda _: True
+        )
         watcher = Watcher(engine, observer=observer, clock=lambda: 0)
         watcher.start()
         assert db.get_file(unknown)["status"] == "unknown"
@@ -165,8 +180,14 @@ def test_bad_settings_reload_keeps_previous_watches(tmp_path):
     save_config(cfg, home)
     events = []
     with Database(home) as db:
-        engine = Engine(cfg, db, FakeIdentifier(outcome()), events.append,
-                        read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        engine = Engine(
+            cfg,
+            db,
+            FakeIdentifier(outcome()),
+            events.append,
+            read_pdf_fn=lambda _: {},
+            stable_fn=lambda _: True,
+        )
         watcher = Watcher(engine, observer=FakeObserver(), clock=lambda: 0)
         watcher.start()
         (home / "config.json").write_text("{bad", encoding="utf-8")

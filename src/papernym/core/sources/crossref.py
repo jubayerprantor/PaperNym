@@ -14,5 +14,11 @@ def title_search(title, config, http_get):
     if config.get("email"):
         params["mailto"] = config["email"]
     data = http_get("https://api.crossref.org/works", params=params)
-    return [item for item in (from_csl(raw, "crossref") for raw in
-            ((data or {}).get("message") or {}).get("items", [])) if item]
+    return [
+        item
+        for item in (
+            from_csl(raw, "crossref")
+            for raw in ((data or {}).get("message") or {}).get("items", [])
+        )
+        if item
+    ]

@@ -11,10 +11,12 @@ def test_only_one_writer_and_release(tmp_path):
         assert first.path == tmp_path / "lock"
         with pytest.raises(LockBusyError):
             WriterLock(tmp_path).acquire()
-        code = ("from papernym.core.lock import WriterLock,LockBusyError; "
-                f"lock=WriterLock({str(tmp_path)!r}); "
-                "\ntry: lock.acquire()\nexcept LockBusyError: raise SystemExit(7)\n"
-                "raise SystemExit(0)")
+        code = (
+            "from papernym.core.lock import WriterLock,LockBusyError; "
+            f"lock=WriterLock({str(tmp_path)!r}); "
+            "\ntry: lock.acquire()\nexcept LockBusyError: raise SystemExit(7)\n"
+            "raise SystemExit(0)"
+        )
         child = subprocess.run([sys.executable, "-c", code], check=False, capture_output=True)
         assert child.returncode == 7
     with WriterLock(tmp_path):

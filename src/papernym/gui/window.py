@@ -5,13 +5,29 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QPushButton, QTabWidget,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from .common import app_icon
 from ..core import updates
-from .tabs import (AboutTab, ActivityTab, AttentionTab, FoldersTab, GeneralTab, HistoryTab,
-                   NamingTab, SourcesTab)
+from .common import app_icon
+from .tabs import (
+    AboutTab,
+    ActivityTab,
+    AttentionTab,
+    FoldersTab,
+    GeneralTab,
+    HistoryTab,
+    NamingTab,
+    SourcesTab,
+)
+
 
 class Banner(QWidget):
     """A dismissible, non-blocking message line (text first, so it never relies on colour)."""
@@ -51,8 +67,10 @@ class UpdateBanner(Banner):
 
     def show_update(self, info):
         self.info = info
-        self.show_message(f"PaperNym {info.latest} is available (you have {info.current}). "
-                          f"{updates.how_to_update()}")
+        self.show_message(
+            f"PaperNym {info.latest} is available (you have {info.current}). "
+            f"{updates.how_to_update()}"
+        )
 
     def _download(self):
         QDesktopServices.openUrl(QUrl(self.info.url if self.info else updates.RELEASES_URL))
@@ -71,12 +89,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PaperNym" + ("  [SANDBOX]" if ctl.sandbox else ""))
         self.setWindowIcon(app_icon())
         self.resize(1100, 680)
+        self.setAcceptDrops(True)
         central = QWidget()
         layout = QVBoxLayout(central)
         if ctl.sandbox:
             where = f" in {ctl.home}" if ctl.debug else ""
-            sandbox = QLabel(f"SANDBOX: temporary settings{where}; "
-                             "only a temporary copy of the sample papers is watched.")
+            sandbox = QLabel(
+                f"SANDBOX: temporary settings{where}; "
+                "only a temporary copy of the sample papers is watched."
+            )
             sandbox.setObjectName("banner")
             sandbox.setWordWrap(True)
             layout.addWidget(sandbox)
@@ -95,17 +116,26 @@ class MainWindow(QMainWindow):
         self.history = HistoryTab(ctl)
         self.general = GeneralTab(ctl)
         self.about = AboutTab(ctl)
-        for widget, title in ((self.activity, "&Activity"), (self.attention, "Needs a&ttention"),
-                              (self.folders, "&Folders"), (self.naming, "&Naming"),
-                              (self.sources, "S&ources"), (self.history, "&History"),
-                              (self.general, "&General"), (self.about, "A&bout")):
+        for widget, title in (
+            (self.activity, "&Activity"),
+            (self.attention, "Needs a&ttention"),
+            (self.folders, "&Folders"),
+            (self.naming, "&Naming"),
+            (self.sources, "S&ources"),
+            (self.history, "&History"),
+            (self.general, "&General"),
+            (self.about, "A&bout"),
+        ):
             self.tabs.addTab(widget, title)
         layout.addWidget(self.tabs)
         self.setCentralWidget(central)
         self.statusBar().showMessage("Starting...")
         for index in range(self.tabs.count()):
-            QShortcut(QKeySequence(f"Ctrl+{index + 1}"), self,
-                      activated=lambda i=index: self.tabs.setCurrentIndex(i))
+            QShortcut(
+                QKeySequence(f"Ctrl+{index + 1}"),
+                self,
+                activated=lambda i=index: self.tabs.setCurrentIndex(i),
+            )
         QShortcut(QKeySequence("Ctrl+W"), self, activated=self.close)
 
     def set_attention_count(self, count: int):
@@ -120,6 +150,32 @@ class MainWindow(QMainWindow):
         self.setWindowState((self.windowState() & ~Qt.WindowMinimized) | Qt.WindowActive)
         self.raise_()
         self.activateWindow()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if any(url.toLocalFile().lower().endswith(".pdf") for url in urls):
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if any(url.toLocalFile().lower().endswith(".pdf") for url in urls):
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dropEvent(self, event):
+        paths = [
+            url.toLocalFile()
+            for url in event.mimeData().urls()
+            if url.toLocalFile().lower().endswith(".pdf")
+        ]
+        if paths:
+            event.acceptProposedAction()
+            self.ctl.handle_dropped_files(paths)
 
     def closeEvent(self, event):
         if self.ctl.quitting:

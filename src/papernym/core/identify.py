@@ -2,26 +2,34 @@
 
 from __future__ import annotations
 
-import difflib
 import datetime as dt
+import difflib
 import json
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from .pdfread import ARXIV_FILE_RE, ARXIV_RE, YEAR_RE, find_dois
+from .sources import arxiv, crossref, doiorg, europepmc, openalex, semanticscholar
 from .sources.common import surname
-from .sources import arxiv, crossref, doiorg, openalex, semanticscholar
 from .sources.http import HttpClient, NetError
 
-
-DOI_SOURCES = (("crossref", crossref.doi_lookup), ("doi.org", doiorg.doi_lookup),
-               ("openalex", openalex.doi_lookup), ("semanticscholar", semanticscholar.doi_lookup))
+DOI_SOURCES = (
+    ("crossref", crossref.doi_lookup),
+    ("doi.org", doiorg.doi_lookup),
+    ("openalex", openalex.doi_lookup),
+    ("semanticscholar", semanticscholar.doi_lookup),
+    ("europepmc", europepmc.doi_lookup),
+)
 ARXIV_SOURCES = (("arxiv", arxiv.arxiv_lookup), ("semanticscholar", semanticscholar.arxiv_lookup))
-TITLE_SOURCES = (("crossref", crossref.title_search), ("openalex", openalex.title_search),
-                 ("semanticscholar", semanticscholar.title_search))
+TITLE_SOURCES = (
+    ("crossref", crossref.title_search),
+    ("openalex", openalex.title_search),
+    ("semanticscholar", semanticscholar.title_search),
+    ("europepmc", europepmc.title_search),
+)
 
 
 @dataclass
@@ -45,8 +53,23 @@ class IdentifyOutcome:
     stats: LookupStats
 
 
+_TRANSLITERATIONS = str.maketrans(
+    {
+        "æ": "ae",
+        "œ": "oe",
+        "ß": "ss",
+        "Æ": "Ae",
+        "Œ": "Oe",
+        "–": " ",
+        "—": " ",
+        "−": "-",
+    }
+)
+
+
 def ascii_fold(text: str) -> str:
-    return unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode()
+    cleaned = str(text or "").translate(_TRANSLITERATIONS)
+    return unicodedata.normalize("NFKD", cleaned).encode("ascii", "ignore").decode()
 
 
 def normal_title(text: str) -> str:
@@ -74,12 +97,19 @@ def titles_match(left: str, right: str) -> bool:
 def author_on_page(surname: str, page1: str) -> bool:
     name = ascii_fold(surname).strip()
     page = ascii_fold(page1)
-    return bool(name) and re.search(r"(?<![A-Za-z])" + re.escape(name) + r"(?![A-Za-z])", page) is not None
+    return (
+        bool(name)
+        and re.search(r"(?<![A-Za-z])" + re.escape(name) + r"(?![A-Za-z])", page) is not None
+    )
 
 
 def title_hit_ok(meta: dict | None, query: str, info: dict) -> bool:
-    return bool(meta and meta.get("authors") and titles_match(meta["title"], query)
-                and author_on_page(meta["authors"][0], info["page1"]))
+    return bool(
+        meta
+        and meta.get("authors")
+        and titles_match(meta["title"], query)
+        and author_on_page(meta["authors"][0], info["page1"])
+    )
 
 
 def _author_names(raw: str) -> list[str]:
@@ -114,8 +144,9 @@ def offline_record(info: dict) -> dict | None:
             year = int(match.group(1))
             break
     if year is None:
-        plausible = [int(value) for value in YEAR_RE.findall(page)
-                     if int(value) <= dt.date.today().year + 1]
+        plausible = [
+            int(value) for value in YEAR_RE.findall(page) if int(value) <= dt.date.today().year + 1
+        ]
         if plausible:
             counts = {value: plausible.count(value) for value in plausible}
             year = max(plausible, key=lambda value: counts[value])
@@ -133,13 +164,24 @@ def offline_record(info: dict) -> dict | None:
         first = line_first
     else:
         first = ""
-    return {"title": title, "year": year, "year_online": year,
-            "authors": [first] if first else [], "journal": "", "source": "pdf-only"}
+    return {
+        "title": title,
+        "year": year,
+        "year_online": year,
+        "authors": [first] if first else [],
+        "journal": "",
+        "source": "pdf-only",
+    }
 
 
 class Identifier:
-    def __init__(self, config: dict, http_get: Callable | None = None,
-                 on_event: Callable | None = None, db=None):
+    def __init__(
+        self,
+        config: dict,
+        http_get: Callable | None = None,
+        on_event: Callable | None = None,
+        db=None,
+    ):
         self.config = config
         self.http_get = http_get or HttpClient(config).get
         self.on_event = on_event or (lambda event: None)
@@ -184,11 +226,18 @@ class Identifier:
     def _save_match(self, match: PaperMatch) -> PaperMatch:
         if self.db is not None and not self.read_only:
             meta = match.meta
-            self.db.put_paper({"paper_id": match.paper_id, "title": meta["title"],
-                               "year": meta.get("year"), "year_online": meta.get("year_online"),
-                               "authors": json.dumps(meta.get("authors", []), ensure_ascii=False),
-                               "journal": meta.get("journal", ""), "source": meta["source"],
-                               "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+            self.db.put_paper(
+                {
+                    "paper_id": match.paper_id,
+                    "title": meta["title"],
+                    "year": meta.get("year"),
+                    "year_online": meta.get("year_online"),
+                    "authors": json.dumps(meta.get("authors", []), ensure_ascii=False),
+                    "journal": meta.get("journal", ""),
+                    "source": meta["source"],
+                    "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                }
+            )
         return match
 
     def _call(self, source: str, function: Callable, value: str, stats: LookupStats, path: Path):
@@ -202,18 +251,27 @@ class Identifier:
             stats.failed += 1
             if source not in self._warned:
                 self._warned.add(source)
-                self.on_event({"type": "source_unavailable", "path": str(path), "source": source,
-                               "message": f"{source} unavailable: {exc}"})
+                self.on_event(
+                    {
+                        "type": "source_unavailable",
+                        "path": str(path),
+                        "source": source,
+                        "message": f"{source} unavailable: {exc}",
+                    }
+                )
             return None
 
-    def identify_online(self, path: str | Path, info: dict,
-                        *, refresh: bool = False,
-                        only_doi: str | None = None) -> tuple[PaperMatch | None, LookupStats]:
+    def identify_online(
+        self, path: str | Path, info: dict, *, refresh: bool = False, only_doi: str | None = None
+    ) -> tuple[PaperMatch | None, LookupStats]:
         path = Path(path)
         stats = LookupStats()
         meta_dois = [doi.lower() for doi in info.get("md_dois", [])]
-        candidates = ([only_doi.lower().rstrip(".)('")] if only_doi else
-                      list(dict.fromkeys(meta_dois + find_dois(info.get("text", ""))))[:6])
+        candidates = (
+            [only_doi.lower().rstrip(".)('")]
+            if only_doi
+            else list(dict.fromkeys(meta_dois + find_dois(info.get("text", ""))))[:6]
+        )
         for doi in candidates:
             ident = "doi:" + doi
             cached = None if refresh else self._cached(ident)
@@ -254,8 +312,42 @@ class Identifier:
                         return self._save_match(PaperMatch(ident, meta)), stats
                 if stats.reached > before[0] and stats.failed == before[1]:
                     self._mark_miss(ident)
+        pmid = info.get("pmid")
+        if pmid:
+            ident = "pmid:" + pmid
+            cached = None if refresh else self._cached(ident)
+            trusted = len(info.get("text", "")) < 200
+            if cached and (trusted or title_in_text(cached.meta["title"], info.get("text", ""))):
+                return cached, stats
+            if not refresh and self._miss_fresh(ident):
+                stats.reached += 1
+            else:
+                before = (stats.reached, stats.failed)
+                meta = self._call("europepmc", europepmc.pmid_lookup, pmid, stats, path)
+                if meta and (trusted or title_in_text(meta["title"], info.get("text", ""))):
+                    return self._save_match(PaperMatch(ident, meta)), stats
+                if stats.reached > before[0] and stats.failed == before[1]:
+                    self._mark_miss(ident)
+        pmcid = info.get("pmcid")
+        if pmcid:
+            ident = "pmcid:" + pmcid.lower()
+            cached = None if refresh else self._cached(ident)
+            trusted = len(info.get("text", "")) < 200
+            if cached and (trusted or title_in_text(cached.meta["title"], info.get("text", ""))):
+                return cached, stats
+            if not refresh and self._miss_fresh(ident):
+                stats.reached += 1
+            else:
+                before = (stats.reached, stats.failed)
+                meta = self._call("europepmc", europepmc.pmcid_lookup, pmcid, stats, path)
+                if meta and (trusted or title_in_text(meta["title"], info.get("text", ""))):
+                    return self._save_match(PaperMatch(ident, meta)), stats
+                if stats.reached > before[0] and stats.failed == before[1]:
+                    self._mark_miss(ident)
         if self.config.get("title_search", True):
-            queries = dict.fromkeys(title for title in (info.get("big_title"), info.get("md_title")) if title)
+            queries = dict.fromkeys(
+                title for title in (info.get("big_title"), info.get("md_title")) if title
+            )
             for query in queries:
                 ident = "title:" + normal_title(query)
                 cached = None if refresh else self._cached(ident)
@@ -268,7 +360,9 @@ class Identifier:
                 for source, function in TITLE_SOURCES:
                     for meta in self._call(source, function, query, stats, path) or []:
                         if title_hit_ok(meta, query, info):
-                            return self._save_match(PaperMatch("title:" + normal_title(meta["title"]), meta)), stats
+                            return self._save_match(
+                                PaperMatch("title:" + normal_title(meta["title"]), meta)
+                            ), stats
                 if stats.reached > before[0] and stats.failed == before[1]:
                     self._mark_miss(ident)
         return None, stats
@@ -279,6 +373,8 @@ class Identifier:
             return IdentifyOutcome(match, "ok", 0, stats)
         if stats.reached:
             return IdentifyOutcome(None, "unknown", 1, stats)
+        if info.get("scanned"):
+            return IdentifyOutcome(None, "scanned", 0, stats)
         if info.get("paperish"):
             meta = offline_record(info)
             if meta:

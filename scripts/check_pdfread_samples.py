@@ -26,9 +26,17 @@ def main() -> int:
             shutil.copy2(original, copy)
             info = read_pdf(copy)
             dois = info["md_dois"] or find_dois(info["text"])
-            print(json.dumps({"file": original.name, "doi": dois[0] if dois else None,
-                              "title": info["big_title"] or None,
-                              "md_title": info["md_title"] or None}, ensure_ascii=True))
+            print(
+                json.dumps(
+                    {
+                        "file": original.name,
+                        "doi": dois[0] if dois else None,
+                        "title": info["big_title"] or None,
+                        "md_title": info["md_title"] or None,
+                    },
+                    ensure_ascii=True,
+                )
+            )
     return 0
 
 

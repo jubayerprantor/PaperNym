@@ -1,5 +1,5 @@
-import requests
 import pytest
+import requests
 
 from papernym import __version__
 from papernym.core.sources.http import HttpClient, NetError
@@ -34,11 +34,15 @@ def test_user_agent_timeout_headers_and_text():
     assert client.get("https://example.org", headers={"Accept": "text/xml"}, kind="text") == "atom"
     _, kwargs = session.calls[0]
     assert kwargs["timeout"] == 12
-    assert kwargs["headers"]["User-Agent"].startswith(f"PaperNym/{__version__} (mailto:a@example.org)")
+    assert kwargs["headers"]["User-Agent"].startswith(
+        f"PaperNym/{__version__} (mailto:a@example.org)"
+    )
     assert kwargs["headers"]["Accept"] == "text/xml"
 
 
-@pytest.mark.parametrize("first", [requests.ConnectionError("offline"), Response(429), Response(503)])
+@pytest.mark.parametrize(
+    "first", [requests.ConnectionError("offline"), Response(429), Response(503)]
+)
 def test_one_retry_then_success(first):
     waits = []
     session = Session(first, Response(200, {"ok": True}))
@@ -79,7 +83,9 @@ def test_errors_never_carry_the_api_key():
 
     class Broken:
         def get(self, url, params=None, headers=None, timeout=None):
-            raise requests.ConnectionError(f"Max retries exceeded with url: /works?search=x&api_key=SECRET123 ({url})")
+            raise requests.ConnectionError(
+                f"Max retries exceeded with url: /works?search=x&api_key=SECRET123 ({url})"
+            )
 
     client = HttpClient({"email": ""}, session=Broken(), sleep=lambda _: None)
     try:

@@ -9,7 +9,6 @@ import requests
 
 from papernym import __version__
 
-
 _SECRET_PARAM = re.compile(r"((?:api_key|apikey|key|token)=)[^&\s'\"]+", re.IGNORECASE)
 
 

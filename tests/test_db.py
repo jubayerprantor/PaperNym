@@ -1,6 +1,6 @@
-import os
 import csv
 import json
+import os
 import sqlite3
 import time
 
@@ -10,22 +10,41 @@ from papernym.core.db import Database, DatabaseError, path_key
 
 
 def paper(paper_id="doi:10.1/test"):
-    return {"paper_id": paper_id, "title": "A paper", "year": 2025, "year_online": 2024,
-            "authors": '["Smith"]', "journal": "Journal", "source": "crossref",
-            "fetched_at": "2026-11-10T00:00:00"}
+    return {
+        "paper_id": paper_id,
+        "title": "A paper",
+        "year": 2025,
+        "year_online": 2024,
+        "authors": '["Smith"]',
+        "journal": "Journal",
+        "source": "crossref",
+        "fetched_at": "2026-11-10T00:00:00",
+    }
 
 
 def file(path, paper_id="doi:10.1/test"):
-    return {"path": str(path), "display_path": str(path), "fingerprint": "abc",
-            "size": 10, "mtime": 123, "status": "ok", "given_name": path.name,
-            "paper_id": paper_id, "attempts": 0, "updated_at": "2026-11-10T00:00:00"}
+    return {
+        "path": str(path),
+        "display_path": str(path),
+        "fingerprint": "abc",
+        "size": 10,
+        "mtime": 123,
+        "status": "ok",
+        "given_name": path.name,
+        "paper_id": paper_id,
+        "attempts": 0,
+        "updated_at": "2026-11-10T00:00:00",
+    }
 
 
 def test_schema_pragmas_and_queries(tmp_path):
     with Database(tmp_path) as db:
         assert db.conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert db.conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-        assert db.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == "1"
+        assert (
+            db.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0]
+            == "1"
+        )
         db.put_paper(paper())
         name = tmp_path / "paper.pdf"
         db.put_file(file(name))
@@ -87,16 +106,43 @@ def test_prototype_migration_imports_state_history_and_config(tmp_path):
     old.mkdir()
     home = tmp_path / "PaperNym"
     legacy_path = str(tmp_path / "named.pdf")
-    state = {"version": 2, "files": {legacy_path: {"path": legacy_path,
-        "fp": "fingerprint", "sig": [100, 99], "status": "ok", "attempts": 2,
-        "given": "named.pdf", "meta": {"title": "Test Article", "year": 2025,
-        "year_online": 2024, "authors": ["Smith"], "journal": "J", "source": "crossref"}}}}
+    state = {
+        "version": 2,
+        "files": {
+            legacy_path: {
+                "path": legacy_path,
+                "fp": "fingerprint",
+                "sig": [100, 99],
+                "status": "ok",
+                "attempts": 2,
+                "given": "named.pdf",
+                "meta": {
+                    "title": "Test Article",
+                    "year": 2025,
+                    "year_online": 2024,
+                    "authors": ["Smith"],
+                    "journal": "J",
+                    "source": "crossref",
+                },
+            }
+        },
+    }
     (old / "state.json").write_text(json.dumps(state), encoding="utf-8")
     with (old / "history.csv").open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=["time", "old_path", "new_path", "source", "status", "batch"])
+        writer = csv.DictWriter(
+            stream, fieldnames=["time", "old_path", "new_path", "source", "status", "batch"]
+        )
         writer.writeheader()
-        writer.writerow({"time": "now", "old_path": "old.pdf", "new_path": legacy_path,
-                         "source": "crossref", "status": "ok", "batch": "b"})
+        writer.writerow(
+            {
+                "time": "now",
+                "old_path": "old.pdf",
+                "new_path": legacy_path,
+                "source": "crossref",
+                "status": "ok",
+                "batch": "b",
+            }
+        )
     (old / "config.json").write_text(json.dumps({"year": "online"}), encoding="utf-8")
     with Database(home) as db:
         assert db.get_file(legacy_path)["given_name"] == "named.pdf"
@@ -115,8 +161,22 @@ def test_older_prototype_state_format(tmp_path):
     old = tmp_path / "PaperRenamer"
     old.mkdir()
     path = str(tmp_path / "old.pdf")
-    (old / "state.json").write_text(json.dumps({"hash": {"path": path, "status": "check",
-        "meta": {"title": "Older Article", "year": 2022, "authors": [], "source": "pdf-only"}}}))
+    (old / "state.json").write_text(
+        json.dumps(
+            {
+                "hash": {
+                    "path": path,
+                    "status": "check",
+                    "meta": {
+                        "title": "Older Article",
+                        "year": 2022,
+                        "authors": [],
+                        "source": "pdf-only",
+                    },
+                }
+            }
+        )
+    )
     with Database(tmp_path / "PaperNym") as db:
         assert db.get_file(path)["given_name"] == "old.pdf"
         assert db.get_file(path)["fingerprint"] == "hash"
@@ -136,10 +196,20 @@ def test_prototype_config_with_title_length_migrates(tmp_path):
     old = tmp_path / "PaperRenamer"
     old.mkdir()
     folder = str(tmp_path / "papers")
-    (old / "config.json").write_text(json.dumps({
-        "folders": [{"path": folder, "recursive": True}], "format": "{year}_{author}_{title}",
-        "word_sep": "_", "max_title_chars": 90, "openalex_key": "", "s2_key": "", "email": ""}),
-        encoding="utf-8")
+    (old / "config.json").write_text(
+        json.dumps(
+            {
+                "folders": [{"path": folder, "recursive": True}],
+                "format": "{year}_{author}_{title}",
+                "word_sep": "_",
+                "max_title_chars": 90,
+                "openalex_key": "",
+                "s2_key": "",
+                "email": "",
+            }
+        ),
+        encoding="utf-8",
+    )
     home = tmp_path / "PaperNym"
     with Database(home):
         pass

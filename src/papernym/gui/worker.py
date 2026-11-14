@@ -9,14 +9,15 @@ from __future__ import annotations
 
 import csv
 import itertools
+import json
 import logging
 import queue
 import threading
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QThread, Signal
 
 from ..core import engine as engine_module
 from ..core.config import ConfigError, add_folder, load_config, save_config, with_env
@@ -27,8 +28,10 @@ from ..core.watcher import Watcher
 
 log = logging.getLogger("papernym")
 
-BUSY_MESSAGE = ("PaperNym is already renaming files from another window or from "
-                "'papernym watch'. Quit that one first.")
+BUSY_MESSAGE = (
+    "PaperNym is already renaming files from another window or from "
+    "'papernym watch'. Quit that one first."
+)
 ATTENTION = ("check", "unknown", "pending", "unreadable")
 
 
@@ -39,15 +42,23 @@ def _rows(rows) -> list[dict]:
 class Worker(QThread):
     """One thread, one queue: watcher events, timers and UI jobs run here in turn."""
 
-    event = Signal(object)        # core event dict
-    done = Signal(int, object)    # job id, result
-    failed = Signal(int, str)     # job id, message
-    fatal = Signal(str)           # could not start (lock busy, bad settings, bad database)
+    event = Signal(object)  # core event dict
+    done = Signal(int, object)  # job id, result
+    failed = Signal(int, str)  # job id, message
+    fatal = Signal(str)  # could not start (lock busy, bad settings, bad database)
     ready = Signal()
 
-    def __init__(self, home: Path, *, poll: bool = False, http_get: Callable | None = None,
-                 read_pdf_fn: Callable | None = None, stable_fn: Callable | None = None,
-                 observer=None, parent=None):
+    def __init__(
+        self,
+        home: Path,
+        *,
+        poll: bool = False,
+        http_get: Callable | None = None,
+        read_pdf_fn: Callable | None = None,
+        stable_fn: Callable | None = None,
+        observer=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.home = Path(home)
         self.poll = poll
@@ -66,8 +77,9 @@ class Worker(QThread):
         self.failed.connect(self._dispatch_failed)
 
     # UI-thread API --------------------------------------------------------------
-    def call(self, function: Callable, on_done: Callable | None = None,
-             on_fail: Callable | None = None) -> int:
+    def call(
+        self, function: Callable, on_done: Callable | None = None, on_fail: Callable | None = None
+    ) -> int:
         """Run ``function(worker)`` on the worker thread; callbacks run on the UI thread."""
         job = next(self._ids)
         self._callbacks[job] = (on_done, on_fail)
@@ -103,7 +115,9 @@ class Worker(QThread):
             kwargs = {"stable_fn": self.stable_fn or engine_module.stable_file}
             if self.read_pdf_fn:
                 kwargs["read_pdf_fn"] = self.read_pdf_fn
-            self.engine = engine_module.Engine(config, self.db, identifier, on_event=self._emit, **kwargs)
+            self.engine = engine_module.Engine(
+                config, self.db, identifier, on_event=self._emit, **kwargs
+            )
             self.watcher = Watcher(self.engine, poll=self.poll, observer=self.observer)
             self.watcher.start()
         except LockBusyError:
@@ -194,7 +208,9 @@ class Worker(QThread):
                 self._use_config(previous)
         return [event for event in events if event["type"] == "preview"]
 
-    def apply_selection(self, rename: list[str], keep: list[str], config: dict | None = None) -> dict:
+    def apply_selection(
+        self, rename: list[str], keep: list[str], config: dict | None = None
+    ) -> dict:
         """Keep the unticked names, save settings (if given), then rename the ticked files.
 
         Everything runs in this one job, so the watcher cannot scan the folder in between.
@@ -209,7 +225,11 @@ class Worker(QThread):
             self.apply_config(config)
         for path in rename:
             result = self.engine.process(path, retry=True, batch=batch)
-            counts["renamed" if result.status in ("ok", "check") and str(result.path) != path else "other"] += 1
+            counts[
+                "renamed"
+                if result.status in ("ok", "check") and str(result.path) != path
+                else "other"
+            ] += 1
         return counts
 
     def add_held_folder(self, config: dict) -> dict:
@@ -221,14 +241,23 @@ class Worker(QThread):
         return saved
 
     def preview_held_folder(self, path: str) -> list[dict]:
-        folder = next(f for f in self.engine.config["folders"] if path_key(f["path"]) == path_key(path))
+        folder = next(
+            f for f in self.engine.config["folders"] if path_key(f["path"]) == path_key(path)
+        )
         _, events = self.collect(lambda: self.engine.scan([folder], dry_run=True))
         return [event for event in events if event["type"] == "preview"]
 
     def release_folder(self, path: str):
         """Stop holding a folder and process anything the preview left (for example new files)."""
         self.watcher.held.discard(path_key(path))
-        folder = next((f for f in self.engine.config.get("folders", []) if path_key(f["path"]) == path_key(path)), None)
+        folder = next(
+            (
+                f
+                for f in self.engine.config.get("folders", [])
+                if path_key(f["path"]) == path_key(path)
+            ),
+            None,
+        )
         if folder is not None and not self.engine.config.get("paused", False):
             self.engine.scan([folder])
 
@@ -250,25 +279,33 @@ class Worker(QThread):
         return {"config": new_config, "warnings": warnings, "count": count, "path": str(root)}
 
     def folder_states(self) -> dict[str, bool]:
-        return {folder["path"]: Path(folder["path"]).is_dir()
-                for folder in self.engine.config.get("folders", [])}
+        return {
+            folder["path"]: Path(folder["path"]).is_dir()
+            for folder in self.engine.config.get("folders", [])
+        }
 
     def recent_history(self, limit: int = 300) -> list[dict]:
-        return _rows(self.db.conn.execute("SELECT * FROM history ORDER BY id DESC LIMIT ?", (limit,)))
+        return _rows(
+            self.db.conn.execute("SELECT * FROM history ORDER BY id DESC LIMIT ?", (limit,))
+        )
 
     def attention(self) -> list[dict]:
         return _rows(self.db.files_by_status(*ATTENTION))
 
     def tool_named_count(self) -> int:
         count = 0
-        for row in self.db.conn.execute("SELECT display_path, given_name FROM files "
-                                        "WHERE status IN ('ok','check') AND paper_id IS NOT NULL"):
+        for row in self.db.conn.execute(
+            "SELECT display_path, given_name FROM files "
+            "WHERE status IN ('ok','check') AND paper_id IS NOT NULL"
+        ):
             if row["given_name"] == Path(row["display_path"]).name:
                 count += 1
         return count
 
     def preview_reformat(self, include_manual: bool) -> list[dict]:
-        _, events = self.collect(lambda: self.engine.reformat(dry_run=True, include_manual=include_manual))
+        _, events = self.collect(
+            lambda: self.engine.reformat(dry_run=True, include_manual=include_manual)
+        )
         return [event for event in events if event["type"] == "preview"]
 
     def export_history(self, target: str) -> int:
@@ -277,8 +314,17 @@ class Worker(QThread):
             writer = csv.writer(stream)
             writer.writerow(["time", "old_path", "new_path", "source", "status", "batch", "undone"])
             for row in rows:
-                writer.writerow([row["time"], row["old_path"], row["new_path"], row["source"],
-                                 row["status"], row["batch"], row["undone"]])
+                writer.writerow(
+                    [
+                        row["time"],
+                        row["old_path"],
+                        row["new_path"],
+                        row["source"],
+                        row["status"],
+                        row["batch"],
+                        row["undone"],
+                    ]
+                )
         return len(rows)
 
     def retry(self, path: str):
@@ -291,6 +337,49 @@ class Worker(QThread):
         config = load_config(self.home, apply_env=False)
         config["paused"] = paused
         return self.apply_config(config)
+
+    def preview_dropped(self, paths: list[str]) -> list[dict]:
+        previews = []
+        for path_str in paths:
+            path = Path(path_str)
+            if path.is_file() and path.suffix.lower() == ".pdf":
+                _, events = self.collect(lambda p=path: self.engine.process(p, dry_run=True))
+                for event in events:
+                    if event.get("type") == "preview":
+                        previews.append(event)
+        return previews
+
+    def rename_dropped(self, paths: list[str]) -> list[dict]:
+        results = []
+        for path_str in paths:
+            path = Path(path_str)
+            if path.is_file() and path.suffix.lower() == ".pdf":
+                res = self.engine.process(path, dry_run=False)
+                results.append(
+                    {"path": str(res.path), "status": res.status, "message": res.message}
+                )
+        return results
+
+    def get_paper_for_file(self, path: str) -> tuple[dict | None, str]:
+        row = self.db.get_file(path)
+        if row and row["paper_id"]:
+            paper = self.db.get_paper(row["paper_id"])
+            if paper:
+                meta = {k: paper[k] for k in ("title", "year", "year_online", "journal", "source")}
+                meta["authors"] = json.loads(paper["authors"])
+                return meta, row["paper_id"]
+        h_row = self.db.conn.execute(
+            "SELECT p.paper_id, p.title, p.year, p.year_online, p.authors, p.journal, p.source "
+            "FROM history h JOIN files f ON (f.display_path=h.new_path OR f.display_path=h.old_path) "
+            "JOIN papers p ON p.paper_id=f.paper_id "
+            "WHERE h.new_path=? OR h.old_path=? LIMIT 1",
+            (path, path),
+        ).fetchone()
+        if h_row:
+            meta = {k: h_row[k] for k in ("title", "year", "year_online", "journal", "source")}
+            meta["authors"] = json.loads(h_row["authors"])
+            return meta, h_row["paper_id"]
+        return None, ""
 
 
 __all__ = ["Worker", "BUSY_MESSAGE", "ConfigError"]

@@ -37,15 +37,39 @@ APP_DIR = DIST / "PaperNym"
 PACKAGE = "papernym"
 INSTALL_DIR = Path("/opt/papernym")
 LINUX_BUNDLED = [name for name in BUNDLED if name != "pywin32-ctypes"] + [
-    "SecretStorage", "jeepney", "cryptography", "cffi", "pycparser"]
+    "SecretStorage",
+    "jeepney",
+    "cryptography",
+    "cffi",
+    "pycparser",
+]
 
 # Shared libraries Qt's xcb (X11) platform plugin loads from the system, plus EGL/GL and
 # D-Bus. apt installs them with the package; most desktops already have them.
-DEPENDS = ["libc6 (>= 2.35)", "libegl1", "libgl1", "libfontconfig1", "libfreetype6", "libdbus-1-3",
-           "libxkbcommon0", "libxkbcommon-x11-0", "libxcb-cursor0", "libxcb-icccm4", "libxcb-image0",
-           "libxcb-keysyms1", "libxcb-randr0", "libxcb-render-util0", "libxcb-shape0", "libxcb-xfixes0",
-           "libxcb-xinerama0", "libxcb-xkb1", "libx11-xcb1", "libwayland-client0", "libwayland-cursor0",
-           "libwayland-egl1"]
+DEPENDS = [
+    "libc6 (>= 2.35)",
+    "libegl1",
+    "libgl1",
+    "libfontconfig1",
+    "libfreetype6",
+    "libdbus-1-3",
+    "libxkbcommon0",
+    "libxkbcommon-x11-0",
+    "libxcb-cursor0",
+    "libxcb-icccm4",
+    "libxcb-image0",
+    "libxcb-keysyms1",
+    "libxcb-randr0",
+    "libxcb-render-util0",
+    "libxcb-shape0",
+    "libxcb-xfixes0",
+    "libxcb-xinerama0",
+    "libxcb-xkb1",
+    "libx11-xcb1",
+    "libwayland-client0",
+    "libwayland-cursor0",
+    "libwayland-egl1",
+]
 
 DESKTOP = """[Desktop Entry]
 Type=Application
@@ -63,8 +87,12 @@ StartupWMClass=PaperNym
 
 def git_snapshot() -> str:
     """+git<date>.<sha>: sorts after the release it builds on and before the next one."""
-    sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True,
-                         text=True).stdout.strip() or "unknown"
+    sha = (
+        subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True
+        ).stdout.strip()
+        or "unknown"
+    )
     return f"+git{dt.date.today():%Y%m%d}.{sha}"
 
 
@@ -72,20 +100,28 @@ def smoke_test() -> None:
     """Both programs start from the built folder, with a temporary settings folder."""
     with tempfile.TemporaryDirectory() as home:
         env = dict(os.environ, PAPERNYM_HOME=home, PAPERNYM_KEYRING="off", NO_COLOR="1")
-        out = subprocess.run([APP_DIR / "papernym-cli", "show"], env=env, capture_output=True,
-                             text=True, timeout=120)
+        out = subprocess.run(
+            [APP_DIR / "papernym-cli", "show"], env=env, capture_output=True, text=True, timeout=120
+        )
         print(out.stdout.strip())
         if out.returncode != 0 or "PaperNym" not in out.stdout:
             raise SystemExit(f"CLI smoke test failed: {out.returncode}\n{out.stderr}")
         # The tray app must load Qt and keep running; it is stopped after a few seconds.
         gui_env = dict(env, QT_QPA_PLATFORM=os.environ.get("QT_QPA_PLATFORM", "offscreen"))
         try:
-            gui = subprocess.run([APP_DIR / "PaperNym", "--sandbox"], env=gui_env, capture_output=True,
-                                 text=True, timeout=10)
+            gui = subprocess.run(
+                [APP_DIR / "PaperNym", "--sandbox"],
+                env=gui_env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
         except subprocess.TimeoutExpired:
             print("GUI smoke test: still running after 10 s (good)")
             return
-        raise SystemExit(f"GUI smoke test failed: exited with {gui.returncode}\n{gui.stderr[-3000:]}")
+        raise SystemExit(
+            f"GUI smoke test failed: exited with {gui.returncode}\n{gui.stderr[-3000:]}"
+        )
 
 
 def icons(root: Path) -> None:
@@ -106,7 +142,10 @@ def icons(root: Path) -> None:
 
 
 def folder_size_kb(path: Path) -> int:
-    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file() and not f.is_symlink()) // 1024 + 1
+    return (
+        sum(f.stat().st_size for f in path.rglob("*") if f.is_file() and not f.is_symlink()) // 1024
+        + 1
+    )
 
 
 def build_deb(deb_version: str) -> Path:
@@ -127,25 +166,31 @@ def build_deb(deb_version: str) -> Path:
 
     control = root / "DEBIAN"
     control.mkdir()
-    (control / "control").write_text("\n".join([
-        f"Package: {PACKAGE}",
-        f"Version: {deb_version}",
-        "Section: utils",
-        "Priority: optional",
-        "Architecture: amd64",
-        "Maintainer: PaperNym maintainers <papernym@users.noreply.github.com>",
-        f"Installed-Size: {folder_size_kb(root)}",
-        "Depends: " + ", ".join(DEPENDS),
-        # Suggests, not Recommends: apt installs recommendations by default, and these would
-        # pull a whole GNOME or KDE desktop onto Xfce, minimal or server systems.
-        "Suggests: gnome-shell-extension-appindicator",
-        "Homepage: https://github.com/Xatta-Trone/PaperNym",
-        "Description: rename research paper PDFs from their publication metadata",
-        " PaperNym watches your folders (such as Downloads) and renames academic PDFs from",
-        " their DOI or arXiv metadata, for example 2025_Smith_Deep_learning_for_....pdf.",
-        " It verifies every match against the PDF's own text, can undo any rename, and",
-        " includes a tray app (papernym-gui) and a command line (papernym).",
-    ]) + "\n", encoding="utf-8")
+    (control / "control").write_text(
+        "\n".join(
+            [
+                f"Package: {PACKAGE}",
+                f"Version: {deb_version}",
+                "Section: utils",
+                "Priority: optional",
+                "Architecture: amd64",
+                "Maintainer: PaperNym maintainers <papernym@users.noreply.github.com>",
+                f"Installed-Size: {folder_size_kb(root)}",
+                "Depends: " + ", ".join(DEPENDS),
+                # Suggests, not Recommends: apt installs recommendations by default, and these would
+                # pull a whole GNOME or KDE desktop onto Xfce, minimal or server systems.
+                "Suggests: gnome-shell-extension-appindicator",
+                "Homepage: https://github.com/Xatta-Trone/PaperNym",
+                "Description: rename research paper PDFs from their publication metadata",
+                " PaperNym watches your folders (such as Downloads) and renames academic PDFs from",
+                " their DOI or arXiv metadata, for example 2025_Smith_Deep_learning_for_....pdf.",
+                " It verifies every match against the PDF's own text, can undo any rename, and",
+                " includes a tray app (papernym-gui) and a command line (papernym).",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     for path in root.rglob("*"):  # dpkg wants sane permissions regardless of the umask
         if path.is_symlink():
             continue
@@ -162,10 +207,15 @@ def build_deb(deb_version: str) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--no-deb", action="store_true", help="build the app folder only")
-    parser.add_argument("--snapshot", action="store_true",
-                        help="add +git<date>.<sha> to the package version (test builds)")
+    parser.add_argument(
+        "--snapshot",
+        action="store_true",
+        help="add +git<date>.<sha> to the package version (test builds)",
+    )
     parser.add_argument("--expected-version", help="fail unless the package version equals this")
     args = parser.parse_args()
     if not sys.platform.startswith("linux"):
@@ -177,8 +227,21 @@ def main() -> int:
     print(f"Building PaperNym {deb_version}", flush=True)
 
     shutil.rmtree(APP_DIR, ignore_errors=True)
-    run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--distpath", DIST,
-         "--workpath", BUILD / "pyinstaller", ROOT / "packaging" / "papernym.spec"], cwd=ROOT)
+    run(
+        [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            "--noconfirm",
+            "--clean",
+            "--distpath",
+            DIST,
+            "--workpath",
+            BUILD / "pyinstaller",
+            ROOT / "packaging" / "papernym.spec",
+        ],
+        cwd=ROOT,
+    )
     for name in ("PaperNym", "papernym-cli"):
         if not (APP_DIR / name).is_file():
             raise SystemExit(f"missing {APP_DIR / name}")

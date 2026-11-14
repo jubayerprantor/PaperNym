@@ -13,11 +13,10 @@ Rules:
 
 ## Current state
 
-- **Current milestone:** M6 built locally (exe, installer, release workflow); M5 manual checklist still open
-- **Next task:** Owner: M5 checklist, push the repo to `Xatta-Trone/papernym`, clean-account install test, then tag `v0.1.0` for the first (unsigned) release
-- **Pending, later (owner, 2026-11-11):** M7 left: tests on `ubuntu-latest` in CI; M8 Linux not started
-- **Last test run:** `.venv\Scripts\python.exe -m pytest -q` — 243 passed
-- **Open questions for the owner:** none (releases go out unsigned; see docs/BUILDING.md)
+- **Current milestone:** Phase 3 Desktop UX & Workflow Integration complete
+- **Next task:** Phase 4 (Packaging & Platform Distribution) and Phase 5 (Community docs & release preparation)
+- **Last test run:** `.venv\Scripts\python.exe -m pytest -q` — 263 passed, 2 skipped (100% pass); `ruff check` and `ruff format` 100% clean
+- **Open questions for the owner:** none
 
 ## Milestones
 
@@ -560,3 +559,27 @@ Newest entry at the bottom. Use this shape:
 - Done: one tag push (`v0.1.4`) ran three workflows. `windows-release.yml` published `PaperNym-Setup-0.1.4.exe`; the new `linux-release.yml` built `papernym_0.1.4_amd64.deb` on Ubuntu 22.04, installed and ran it, and attached it to the same release (https://github.com/Xatta-Trone/papernym/releases/tag/v0.1.4); `pypi-release.yml` ran the tests on Windows, Ubuntu 22.04 and macOS 15 and published 0.1.4 to PyPI.
 - Problem: the first PyPI upload was refused (`invalid-publisher`) because the GitHub repository had been renamed from `papernym` to `PaperNym`; the owner updated the trusted publishers on PyPI and TestPyPI to `PaperNym`, and re-running the failed job published it.
 - Checked: `pip install papernym==0.1.4` from PyPI in a clean environment prints `papernym 0.1.4`. The .deb was tested by hand on an Ubuntu desktop; macOS has passed CI only, not a real Mac.
+
+
+### 2026-11-12  Phase 1  CI workflow, Ruff linting/formatting, coverage and fork setup
+- Done: Added PR and push CI workflow (`.github/workflows/ci.yml`) covering Windows, Ubuntu, and macOS on Python 3.10–3.13; added `ruff` configuration (lint + format) and `pytest-cov` settings in `pyproject.toml`; ran Ruff checks and auto-formatting across the codebase; updated repo URLs to point to fork (`jubayerprantor/PaperNym`).
+- Files: `.github/workflows/ci.yml`, `pyproject.toml`, `.gitignore`, `docs/PROGRESS.md`, source and test formatting.
+- Tests: `ruff check` and `ruff format --check` pass (all 60 files formatted, 0 errors); `pytest -q` (254 passed, 2 skipped, 83% overall coverage).
+- Decisions: Use Ruff for fast linting and formatting; maintain offscreen Qt testing in CI matrix; point fork URLs to `jubayerprantor/PaperNym`.
+- Next: Phase 2 (Metadata Identification: PubMed/Europe PMC and scanned PDF handling).
+
+
+### 2026-11-14  Phase 2  Europe PMC source, scanned PDF detection, reference-trap mitigation, transliteration
+- Done: Added Europe PMC scholarly service adapter (`core/sources/europepmc.py`) supporting DOI lookup, PMID lookup, PMCID lookup, and title search; integrated Europe PMC into `DOI_SOURCES`, `TITLE_SOURCES`, and `apitest.py`; added PMID/PMCID regex detection in `core/pdfread.py`; added graceful scanned/image-only PDF detection (`scanned` status with clear "OCR needed" message); enhanced reference-DOI trap mitigation in `find_dois` by deprioritizing DOIs following references/bibliography section headers; added ligature (`æ`, `œ`, `ß`, `Æ`, `Œ`) and typographical dash/quote transliteration in `clean_field` and `ascii_fold`.
+- Files: `src/papernym/core/sources/europepmc.py`, `src/papernym/core/identify.py`, `src/papernym/core/pdfread.py`, `src/papernym/core/engine.py`, `src/papernym/core/naming.py`, `src/papernym/core/apitest.py`, `tests/test_sources.py`, `tests/test_identify.py`, `tests/test_pdfread.py`, `tests/test_naming.py`, `tests/test_engine.py`, `tests/test_cli.py`, `docs/PROGRESS.md`.
+- Tests: `ruff check` and `ruff format --check` pass (all 61 files formatted, 0 errors); `pytest -q` (260 passed, 2 skipped, 83% overall coverage).
+- Decisions: Treat Europe PMC as free open source without requiring API keys; report scanned PDFs specifically as "scanned" to prevent repeated lookup attempts and guide the user.
+- Next: Phase 3 (Desktop UX: Drag-and-drop quick renamer, table search/filter in GUI).
+
+
+### 2026-11-14  Phase 3  Desktop UX: Drag-and-drop quick renamer, BibTeX citation export, history filter
+- Done: Added `to_bibtex(meta, paper_id)` citation generator in `core/naming.py` with standard BibTeX format and clean citekey derivation; added drag-and-drop handling directly onto the PaperNym desktop main window (`dragEnterEvent`, `dragMoveEvent`, `dropEvent`) with confirmation dialog before batch renaming outside watched folders; added "Copy BibTeX" context menu actions and buttons to both Activity and History tabs with clipboard integration; added instant search bar (`QLineEdit`) and status filter dropdown (`QComboBox`) to History tab with live filtering across old path, new path, and title.
+- Files: `src/papernym/core/naming.py`, `src/papernym/gui/worker.py`, `src/papernym/gui/app.py`, `src/papernym/gui/window.py`, `src/papernym/gui/tabs.py`, `tests/test_naming.py`, `tests/test_gui.py`, `docs/PROGRESS.md`.
+- Tests: `ruff check` and `ruff format --check` pass (all 61 files formatted, 0 errors); `pytest -q` (263 passed, 2 skipped, 100% pass rate).
+- Decisions: Support dragging both individual PDF files and entire folders; keep drag-and-drop renaming guarded with an interactive confirmation dialog showing old -> new previews before executing; allow searching across all fields in history.
+- Next: Phase 4 (Packaging & Platform Distribution) and Phase 5 (Community Documentation & README).

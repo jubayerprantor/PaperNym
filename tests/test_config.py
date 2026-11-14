@@ -59,12 +59,20 @@ def test_keys_stay_in_config_when_the_store_is_off(tmp_path, monkeypatch, memory
     assert memory_keyring.items == {}
 
 
-@pytest.mark.parametrize("change", [
-    {"year": "maybe"},
-    {"word_sep": "/"}, {"paused": "no"}, {"folders": [{"path": "x"}]},
-    {"exclude": [1]}, {"format": "{bogus}"}, {"format": "plain"},
-    {"format": "{year}/bad"}, {"format": "{year}" + "x" * 61},
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"year": "maybe"},
+        {"word_sep": "/"},
+        {"paused": "no"},
+        {"folders": [{"path": "x"}]},
+        {"exclude": [1]},
+        {"format": "{bogus}"},
+        {"format": "plain"},
+        {"format": "{year}/bad"},
+        {"format": "{year}" + "x" * 61},
+    ],
+)
 def test_invalid_settings_rejected(change):
     with pytest.raises(config.ConfigError):
         config.validate_config(change)
@@ -135,7 +143,6 @@ def test_retired_title_limit_is_dropped(tmp_path):
     assert "title_limit" not in loaded and loaded["year"] == "online"
     config.save_config(loaded, tmp_path)
     assert "title_limit" not in json.loads((tmp_path / "config.json").read_text())
-
 
 
 def test_reading_while_another_thread_saves(tmp_path):

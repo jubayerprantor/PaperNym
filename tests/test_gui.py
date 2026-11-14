@@ -73,8 +73,13 @@ def make_ctl(qapp, tmp_path, monkeypatch):
         if folder is not None:
             settings = add_folder(settings, folder)
         save_config(settings, home)
-        ctl = Controller(home, http_get=http, interactive=False, first_run=first_run,
-                         worker_kwargs={"observer": FakeObserver(), "stable_fn": lambda _: True})
+        ctl = Controller(
+            home,
+            http_get=http,
+            interactive=False,
+            first_run=first_run,
+            worker_kwargs={"observer": FakeObserver(), "stable_fn": lambda _: True},
+        )
         ready = []
         ctl.worker.ready.connect(lambda: ready.append(True))
         assert wait(qapp, lambda: ready or ctl.worker.isFinished())
@@ -89,8 +94,11 @@ def make_ctl(qapp, tmp_path, monkeypatch):
 
 def call(qapp, ctl, function):
     box = {}
-    ctl.worker.call(function, lambda result: box.setdefault("ok", result),
-                    lambda message: box.setdefault("error", message))
+    ctl.worker.call(
+        function,
+        lambda result: box.setdefault("ok", result),
+        lambda message: box.setdefault("error", message),
+    )
     assert wait(qapp, lambda: box), "worker job did not finish"
     if "error" in box:
         raise AssertionError(box["error"])
@@ -165,9 +173,13 @@ def test_preview_ticked_renamed_unticked_kept(qapp, make_ctl, tmp_path):
     dialog = PreviewDialog("t", "i", items)
     assert dialog.count.text() == "2 of 2 selected"
     dialog.tree.topLevelItem(1).setCheckState(0, Qt.Unchecked)
-    assert dialog.selected() == [items[0]["old_path"]] and dialog.unselected() == [items[1]["old_path"]]
+    assert dialog.selected() == [items[0]["old_path"]] and dialog.unselected() == [
+        items[1]["old_path"]
+    ]
     config = add_folder(ctl.config, folder)
-    counts = call(qapp, ctl, lambda w: w.apply_selection(dialog.selected(), dialog.unselected(), config))
+    counts = call(
+        qapp, ctl, lambda w: w.apply_selection(dialog.selected(), dialog.unselected(), config)
+    )
     assert counts == {"renamed": 1, "kept": 1, "other": 0}
     assert (folder / EXPECTED).exists() and b.exists()
     call(qapp, ctl, lambda w: w.scan_now())
@@ -202,11 +214,23 @@ def test_naming_tab_validation_and_reformat_preview(qapp, make_ctl, tmp_path):
 
 def test_banners_pause_and_folder_error_state(qapp, make_ctl, tmp_path):
     ctl = make_ctl()
-    ctl.on_event({"type": "source_unavailable", "path": "", "source": "crossref",
-                  "message": "crossref unavailable: offline"})
+    ctl.on_event(
+        {
+            "type": "source_unavailable",
+            "path": "",
+            "source": "crossref",
+            "message": "crossref unavailable: offline",
+        }
+    )
     assert not ctl.window.outage.isHidden() and "_CHECK" in ctl.window.outage.label.text()
-    ctl.on_event({"type": "source_unavailable", "path": "", "source": "openalex",
-                  "message": "openalex unavailable: HTTP 403: key rejected or access denied"})
+    ctl.on_event(
+        {
+            "type": "source_unavailable",
+            "path": "",
+            "source": "openalex",
+            "message": "openalex unavailable: HTTP 403: key rejected or access denied",
+        }
+    )
     assert not ctl.window.sources.banner.isHidden()
     assert ctl.tray_state()[0] == "attention"
     ctl.toggle_pause()
@@ -225,20 +249,44 @@ def test_scan_notifications_are_batched(qapp, make_ctl, monkeypatch):
     ctl.on_event({"type": "scan_started", "path": ".", "message": "", "total": 5})
     assert ctl.tray_state()[0] == "working"
     for index in range(5):
-        ctl.on_event({"type": "renamed", "path": f"n{index}.pdf", "new_path": f"n{index}.pdf",
-                      "old_path": f"o{index}.pdf", "source": "crossref", "message": ""})
+        ctl.on_event(
+            {
+                "type": "renamed",
+                "path": f"n{index}.pdf",
+                "new_path": f"n{index}.pdf",
+                "old_path": f"o{index}.pdf",
+                "source": "crossref",
+                "message": "",
+            }
+        )
     ctl.on_event({"type": "unidentified", "path": "x.pdf", "message": "paper not identified"})
     assert shown == []
     ctl.on_event({"type": "scan_finished", "path": ".", "message": "", "counts": {}})
     assert shown == ["5 papers renamed"]  # one toast, attention count included in its text
     for index in range(3):  # a burst outside a scan waits for a quiet spell
-        ctl.on_event({"type": "renamed", "path": f"z{index}.pdf", "new_path": f"z{index}.pdf",
-                      "old_path": f"y{index}.pdf", "source": "crossref", "message": ""})
+        ctl.on_event(
+            {
+                "type": "renamed",
+                "path": f"z{index}.pdf",
+                "new_path": f"z{index}.pdf",
+                "old_path": f"y{index}.pdf",
+                "source": "crossref",
+                "message": "",
+            }
+        )
     assert shown == ["5 papers renamed"] and ctl._toast_timer.isActive()
     ctl._flush_toast()
     assert shown == ["5 papers renamed", "3 papers renamed"]
-    ctl.on_event({"type": "renamed", "path": "one.pdf", "new_path": "one.pdf", "old_path": "x.pdf",
-                  "source": "crossref", "message": ""})
+    ctl.on_event(
+        {
+            "type": "renamed",
+            "path": "one.pdf",
+            "new_path": "one.pdf",
+            "old_path": "x.pdf",
+            "source": "crossref",
+            "message": "",
+        }
+    )
     ctl._flush_toast()
     assert shown[-1] == "Paper renamed"
 
@@ -247,8 +295,9 @@ def test_lock_held_elsewhere_is_fatal(qapp, tmp_path, monkeypatch):
     home = tmp_path / "home"
     save_config(default_config(), home)
     with WriterLock(home):
-        ctl = Controller(home, interactive=False, first_run=False,
-                         worker_kwargs={"observer": FakeObserver()})
+        ctl = Controller(
+            home, interactive=False, first_run=False, worker_kwargs={"observer": FakeObserver()}
+        )
         messages = []
         ctl.worker.fatal.connect(messages.append)
         assert wait(qapp, lambda: ctl.worker.isFinished())
@@ -309,7 +358,9 @@ def test_autostart_linux_desktop_file(tmp_path, monkeypatch):
 
 def test_menu_entry_is_written_once_and_removed(tmp_path, monkeypatch):
     monkeypatch.setattr(autostart.sys, "platform", "linux")
-    monkeypatch.setattr(autostart, "launch_command", lambda: '"/opt/venv/bin/python" -m papernym.gui')
+    monkeypatch.setattr(
+        autostart, "launch_command", lambda: '"/opt/venv/bin/python" -m papernym.gui'
+    )
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     assert autostart.install_menu_entry()
     entry = tmp_path / "applications" / "papernym.desktop"
@@ -343,7 +394,9 @@ def macos(tmp_path, monkeypatch):
     monkeypatch.setattr(autostart.sys, "platform", "darwin")
     monkeypatch.setattr(autostart, "os", SimpleNamespace(name="posix", environ=os.environ))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(autostart, "launch_argv", lambda: ["/opt/my venv/bin/python", "-m", "papernym.gui"])
+    monkeypatch.setattr(
+        autostart, "launch_argv", lambda: ["/opt/my venv/bin/python", "-m", "papernym.gui"]
+    )
     return tmp_path
 
 
@@ -371,7 +424,11 @@ def test_macos_app_launcher_is_written_and_removed(macos):
     assert script.startswith("#!/bin/sh\n")
     assert "exec '/opt/my venv/bin/python' -m papernym.gui --show \"$@\"" in script
     icon = (app / "Resources" / "PaperNym.icns").read_bytes()
-    assert icon[:4] == b"icns" and int.from_bytes(icon[4:8], "big") == len(icon) and icon[8:12] == b"ic10"
+    assert (
+        icon[:4] == b"icns"
+        and int.from_bytes(icon[4:8], "big") == len(icon)
+        and icon[8:12] == b"ic10"
+    )
     if os.name != "nt":  # Windows cannot set the executable bit
         assert (app / "MacOS" / "PaperNym").stat().st_mode & 0o777 == 0o755
         assert not autostart.install_menu_entry()  # unchanged: not rewritten
@@ -399,7 +456,9 @@ def test_macos_terminal_launch_detaches(monkeypatch):
 
 def test_detach_starts_a_new_session_and_exits(monkeypatch, capsys):
     calls = []
-    monkeypatch.setattr(gui_app.subprocess, "Popen", lambda command, **kw: calls.append((command, kw)))
+    monkeypatch.setattr(
+        gui_app.subprocess, "Popen", lambda command, **kw: calls.append((command, kw))
+    )
     monkeypatch.setattr(gui_app.autostart, "launch_argv", lambda: ["python", "-m", "papernym.gui"])
     monkeypatch.setattr(gui_app, "should_detach", lambda args: True)
     assert gui_app.main(["--show"]) == 0
@@ -483,10 +542,17 @@ def test_first_run_preview_uses_chosen_format(qapp, make_ctl, tmp_path):
 def test_paged_table_search_filter_and_pages(qapp):
     from papernym.gui.table import PagedTable
 
-    table = PagedTable([("Name", lambda r: r["name"]), ("Status", lambda r: r["status"])],
-                       name="t", search_text=lambda r: r["name"], statuses=["A", "B"],
-                       status_of=lambda r: r["status"], page_size=50)
-    table.set_rows([{"name": f"paper_{i:04d}.pdf", "status": "A" if i % 2 else "B"} for i in range(1234)])
+    table = PagedTable(
+        [("Name", lambda r: r["name"]), ("Status", lambda r: r["status"])],
+        name="t",
+        search_text=lambda r: r["name"],
+        statuses=["A", "B"],
+        status_of=lambda r: r["status"],
+        page_size=50,
+    )
+    table.set_rows(
+        [{"name": f"paper_{i:04d}.pdf", "status": "A" if i % 2 else "B"} for i in range(1234)]
+    )
     assert table.model.rowCount() == 50 and "1-50 of 1234" in table.position.text()
     table._go("last")
     assert table.model.rowCount() == 34 and "Page 25 of 25" in table.position.text()
@@ -526,13 +592,18 @@ def test_activity_buttons_open_reveal_refresh_and_undo(qapp, make_ctl, tmp_path,
     activity = ctl.window.activity
     assert wait(qapp, lambda: activity.table.model.rowCount() >= 1)
     activity.table.view.selectRow(0)
-    open_button, reveal_button, undo_button, refresh_button = activity.buttons
+    open_button, reveal_button, undo_button, refresh_button, bibtex_button = activity.buttons
     open_button.click()
     reveal_button.click()
     assert opened == revealed == [str(folder / EXPECTED)]
     refresh_button.click()
-    assert wait(qapp, lambda: EXPECTED in ctl.window.statusBar().currentMessage()
-                and "Refreshing" not in ctl.window.statusBar().currentMessage())
+    assert wait(
+        qapp,
+        lambda: (
+            EXPECTED in ctl.window.statusBar().currentMessage()
+            and "Refreshing" not in ctl.window.statusBar().currentMessage()
+        ),
+    )
     activity.table.view.selectRow(0)
     undo_button.click()
     assert wait(qapp, lambda: (folder / "download.pdf").exists())
@@ -552,7 +623,11 @@ def test_added_folder_waits_for_its_preview(qapp, make_ctl, tmp_path):
     config = add_folder(ctl.config, folder)
     saved = call(qapp, ctl, lambda w: w.add_held_folder(config))
     assert [f["path"] for f in saved["folders"]] == [str(folder.resolve())]  # listed at once
-    call(qapp, ctl, lambda w: (w.watcher.enqueue(str(folder / "download.pdf")), w.watcher.tick(10**9)))
+    call(
+        qapp,
+        ctl,
+        lambda w: (w.watcher.enqueue(str(folder / "download.pdf")), w.watcher.tick(10**9)),
+    )
     qapp.processEvents()
     time.sleep(0.5)
     qapp.processEvents()
@@ -584,7 +659,9 @@ def test_closing_the_preview_removes_the_added_folder(qapp, make_ctl, tmp_path):
 def test_second_sandbox_launch_shows_the_first(monkeypatch):
     asked = []
     monkeypatch.setattr(gui_app, "signal_existing", lambda name: asked.append(name) or True)
-    monkeypatch.setattr(gui_app, "make_sandbox", lambda: pytest.fail("a second sandbox was created"))
+    monkeypatch.setattr(
+        gui_app, "make_sandbox", lambda: pytest.fail("a second sandbox was created")
+    )
     assert gui_app.main(["--sandbox"]) == 0
     assert asked == [gui_app.SANDBOX_SERVER]
 
@@ -594,7 +671,9 @@ def test_theme_switch_from_general_tab(qapp, make_ctl):
     general = ctl.window.general
     assert general.theme.currentData() == "system"
     general.theme.setCurrentIndex(general.theme.findData("dark"))
-    assert wait(qapp, lambda: ctl.config["theme"] == "dark" and qapp.property("papernymDark") is True)
+    assert wait(
+        qapp, lambda: ctl.config["theme"] == "dark" and qapp.property("papernymDark") is True
+    )
     assert load_config(ctl.home)["theme"] == "dark"
     general.theme.setCurrentIndex(general.theme.findData("light"))
     assert wait(qapp, lambda: qapp.property("papernymDark") is False)
@@ -609,7 +688,10 @@ def test_theme_setting_is_validated(tmp_path):
 
 
 def test_update_check_shows_banner_tray_item_and_skip(qapp, make_ctl):
-    release = {"tag_name": "v9.9.9", "html_url": "https://github.com/Xatta-Trone/PaperNym/releases/tag/v9.9.9"}
+    release = {
+        "tag_name": "v9.9.9",
+        "html_url": "https://github.com/Xatta-Trone/PaperNym/releases/tag/v9.9.9",
+    }
 
     def http(url, params=None, headers=None, kind="json"):
         return release if "api.github.com" in url else fake_http(url, params, headers, kind)
@@ -618,7 +700,10 @@ def test_update_check_shows_banner_tray_item_and_skip(qapp, make_ctl):
     ctl.check_updates(manual=True)
     assert wait(qapp, lambda: ctl.update_info is not None)
     assert ctl.update_action.isVisible() and "v9.9.9" in ctl.update_action.text()
-    assert ctl.window.update_banner.isVisibleTo(ctl.window) and "9.9.9 is available" in ctl.window.update_banner.label.text()
+    assert (
+        ctl.window.update_banner.isVisibleTo(ctl.window)
+        and "9.9.9 is available" in ctl.window.update_banner.label.text()
+    )
     assert "9.9.9 is available" in ctl.window.about.update_status.text()
     ctl.window.update_banner.skip.click()
     assert wait(qapp, lambda: ctl.config["skipped_version"] == "9.9.9")
@@ -645,13 +730,18 @@ def test_settings_folder_is_shown_only_in_debug_mode(qapp, make_ctl, monkeypatch
     from PySide6.QtWidgets import QLabel, QPushButton
 
     ctl = make_ctl()
-    texts = [w.text() for w in ctl.window.general.findChildren(QPushButton)] + [w.text() for w in ctl.window.general.findChildren(QLabel)]
+    texts = [w.text() for w in ctl.window.general.findChildren(QPushButton)] + [
+        w.text() for w in ctl.window.general.findChildren(QLabel)
+    ]
     assert not any("settings folder" in t.lower() for t in texts)
     assert not any(str(ctl.home) in t for t in texts)
     ctl.debug = True
     from papernym.gui.tabs import GeneralTab
+
     debug_tab = GeneralTab(ctl)
-    texts = [w.text() for w in debug_tab.findChildren(QPushButton)] + [w.text() for w in debug_tab.findChildren(QLabel)]
+    texts = [w.text() for w in debug_tab.findChildren(QPushButton)] + [
+        w.text() for w in debug_tab.findChildren(QLabel)
+    ]
     assert any("settings folder" in t.lower() for t in texts)
 
 
@@ -659,8 +749,10 @@ def test_diagnostics_hide_keys_email_and_settings_path(tmp_path):
     from papernym.gui.tabs import mask_diagnostics
 
     home = tmp_path / "PaperNym"
-    log = (f"GET /works?search=x&api_key=SECRET1 failed\nUser-Agent mailto:me@example.org\n"
-           f"database at {home}" + "\\papers.db")
+    log = (
+        f"GET /works?search=x&api_key=SECRET1 failed\nUser-Agent mailto:me@example.org\n"
+        f"database at {home}" + "\\papers.db"
+    )
     masked = mask_diagnostics(log, home)
     assert "SECRET1" not in masked and "me@example.org" not in masked and str(home) not in masked
     assert "<settings>" in masked and "api_key=***" in masked
@@ -702,7 +794,9 @@ def test_naming_tab_has_no_title_length(qapp, make_ctl):
 
 def test_installer_start_at_login_choice_is_adopted_once(qapp, make_ctl, monkeypatch):
     answers = [False]
-    monkeypatch.setattr(autostart, "take_installer_choice", lambda: answers.pop() if answers else None)
+    monkeypatch.setattr(
+        autostart, "take_installer_choice", lambda: answers.pop() if answers else None
+    )
     calls = []
     monkeypatch.setattr(autostart, "set_enabled", calls.append)
     monkeypatch.setattr(autostart, "is_enabled", lambda: True)
@@ -722,3 +816,45 @@ def test_installer_start_at_login_choice_is_adopted_once(qapp, make_ctl, monkeyp
 def test_welcome_wizard_login_default_from_installer(wizard):
     assert wizard([], login_default=False).start_at_login() is False
 
+
+def test_history_search_filter_and_bibtex_copy(qapp, make_ctl, tmp_path):
+    folder = tmp_path / "papers"
+    folder.mkdir()
+    paper_pdf(folder / "paper_a.pdf")
+    ctl = make_ctl(folder)
+    history = ctl.window.history
+    assert wait(qapp, lambda: history.tree.topLevelItemCount() >= 1)
+    batch = history.tree.topLevelItem(0)
+    assert batch.childCount() >= 1
+
+    # Filter by search query
+    history.search.setText("nonexistent_filename_xyz")
+    assert batch.isHidden()
+
+    history.search.setText("paper_a")
+    assert not batch.isHidden()
+    history.search.clear()
+
+    # Test BibTeX copy
+    history.tree.setCurrentItem(batch.child(0))
+    history._copy_bibtex()
+    assert wait(
+        qapp,
+        lambda: (
+            "Copied BibTeX citation" in ctl.window.statusBar().currentMessage()
+            or "No scholarly metadata" in ctl.window.statusBar().currentMessage()
+        ),
+    )
+
+
+def test_drag_and_drop_handling(qapp, make_ctl, tmp_path, monkeypatch):
+    ctl = make_ctl(tmp_path)
+    file_path = tmp_path / "dropped.pdf"
+    paper_pdf(file_path)
+
+    # Test preview_dropped on worker
+    previews = []
+    ctl.worker.call(lambda w: w.preview_dropped([str(file_path)]), previews.extend)
+    assert wait(qapp, lambda: len(previews) == 1)
+    assert previews[0]["type"] == "preview"
+    assert "dropped.pdf" in previews[0]["old_path"]

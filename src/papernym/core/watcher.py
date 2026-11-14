@@ -86,8 +86,10 @@ class Watcher:
             return False
         try:
             if not self.engine.config.get("paused", False) and not self._is_held(path):
-                watched = any(self.engine._inside(path, folder["path"], folder.get("recursive", True))
-                              for folder in self.engine.config.get("folders", []))
+                watched = any(
+                    self.engine._inside(path, folder["path"], folder.get("recursive", True))
+                    for folder in self.engine.config.get("folders", [])
+                )
                 if watched:
                     try:
                         self.engine.process(path, batch=uuid.uuid4().hex)
@@ -116,25 +118,40 @@ class Watcher:
         self._lock.release()
 
     def _is_held(self, path) -> bool:
-        return any(self.engine._inside(path, folder["path"], folder.get("recursive", True))
-                   for folder in self.engine.config.get("folders", []) if path_key(folder["path"]) in self.held)
+        return any(
+            self.engine._inside(path, folder["path"], folder.get("recursive", True))
+            for folder in self.engine.config.get("folders", [])
+            if path_key(folder["path"]) in self.held
+        )
 
     def _free(self, folders: list[dict]) -> list[dict]:
         return [folder for folder in folders if path_key(folder["path"]) not in self.held]
 
     def reconcile(self) -> list[dict]:
         """Detach missing watches and attach reachable new or returned folders."""
-        configured = {path_key(folder["path"]): folder for folder in self.engine.config.get("folders", [])}
+        configured = {
+            path_key(folder["path"]): folder for folder in self.engine.config.get("folders", [])
+        }
         for key, (folder, handle) in list(self.watches.items()):
-            if key not in configured or folder != configured[key] or not Path(folder["path"]).is_dir():
+            if (
+                key not in configured
+                or folder != configured[key]
+                or not Path(folder["path"]).is_dir()
+            ):
                 try:
                     self.observer.unschedule(handle)
                 except Exception:
                     pass
                 del self.watches[key]
-                if key in configured and not Path(folder["path"]).is_dir() and key not in self._unavailable:
+                if (
+                    key in configured
+                    and not Path(folder["path"]).is_dir()
+                    and key not in self._unavailable
+                ):
                     self._unavailable.add(key)
-                    self.engine._event("folder_unavailable", Path(folder["path"]), "folder is unavailable")
+                    self.engine._event(
+                        "folder_unavailable", Path(folder["path"]), "folder is unavailable"
+                    )
         attached = []
         for key, folder in configured.items():
             root = Path(folder["path"])
@@ -147,8 +164,9 @@ class Watcher:
             if key in self.watches:
                 continue
             try:
-                handle = self.observer.schedule(self.handler, str(root),
-                                                recursive=folder.get("recursive", True))
+                handle = self.observer.schedule(
+                    self.handler, str(root), recursive=folder.get("recursive", True)
+                )
             except OSError as exc:
                 self.engine._event("folder_unavailable", root, f"cannot watch folder: {exc}")
                 continue
@@ -170,14 +188,18 @@ class Watcher:
                 except ConfigError as exc:
                     if stamp != self._bad_config_stamp:
                         self._bad_config_stamp = stamp
-                        self.engine._event("skipped", self.engine.db.home, f"cannot reload settings: {exc}")
+                        self.engine._event(
+                            "skipped", self.engine.db.home, f"cannot reload settings: {exc}"
+                        )
                 else:
                     self._bad_config_stamp = None
                     self._config_stamp = stamp
                     self.engine.config = config
                     if hasattr(self.engine.identifier, "reload_config"):
                         self.engine.identifier.reload_config(config)
-                    self.engine._event("settings_reloaded", self.engine.db.home, "settings reloaded")
+                    self.engine._event(
+                        "settings_reloaded", self.engine.db.home, "settings reloaded"
+                    )
             attached = self.reconcile()
             self._paused = self.engine.config.get("paused", False)
             if not self.engine.config.get("paused", False):

@@ -47,11 +47,19 @@ def icon_path() -> Path:
 
 
 def desktop_entry(command: str, *, autostart: bool = False) -> str:
-    lines = ["[Desktop Entry]", "Type=Application", "Name=PaperNym", "GenericName=Paper renamer",
-             "Comment=Rename research paper PDFs from their publication metadata",
-             f"Exec={command}", f"Icon={icon_path()}", "Terminal=false",
-             "Categories=Office;Education;Utility;", "Keywords=pdf;paper;rename;doi;arxiv;research;",
-             "StartupWMClass=PaperNym"]
+    lines = [
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=PaperNym",
+        "GenericName=Paper renamer",
+        "Comment=Rename research paper PDFs from their publication metadata",
+        f"Exec={command}",
+        f"Icon={icon_path()}",
+        "Terminal=false",
+        "Categories=Office;Education;Utility;",
+        "Keywords=pdf;paper;rename;doi;arxiv;research;",
+        "StartupWMClass=PaperNym",
+    ]
     if autostart:
         lines.append("X-GNOME-Autostart-enabled=true")
     return "\n".join(lines) + "\n"
@@ -85,13 +93,15 @@ def launch_agent_file() -> Path:
 
 def launch_agent(argv: list[str]) -> bytes:
     """A per-user LaunchAgent that starts the tray app once when the user logs in."""
-    return plistlib.dumps({
-        "Label": MAC_LABEL,
-        "ProgramArguments": argv,
-        "RunAtLoad": True,
-        "ProcessType": "Interactive",
-        "LimitLoadToSessionType": "Aqua",  # the graphical login session only
-    })
+    return plistlib.dumps(
+        {
+            "Label": MAC_LABEL,
+            "ProgramArguments": argv,
+            "RunAtLoad": True,
+            "ProcessType": "Interactive",
+            "LimitLoadToSessionType": "Aqua",  # the graphical login session only
+        }
+    )
 
 
 def _login_file() -> Path:
@@ -148,22 +158,27 @@ def _bundle_files(argv: list[str]) -> dict[str, bytes]:
     from .. import __version__
 
     quoted = " ".join(shlex.quote(arg) for arg in argv)
-    info = plistlib.dumps({
-        "CFBundleName": "PaperNym",
-        "CFBundleDisplayName": "PaperNym",
-        "CFBundleIdentifier": MAC_LABEL,
-        "CFBundleExecutable": "PaperNym",
-        "CFBundleIconFile": "PaperNym",
-        "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": __version__,
-        "CFBundleVersion": __version__,
-        "NSHighResolutionCapable": True,
-    })
+    info = plistlib.dumps(
+        {
+            "CFBundleName": "PaperNym",
+            "CFBundleDisplayName": "PaperNym",
+            "CFBundleIdentifier": MAC_LABEL,
+            "CFBundleExecutable": "PaperNym",
+            "CFBundleIconFile": "PaperNym",
+            "CFBundlePackageType": "APPL",
+            "CFBundleShortVersionString": __version__,
+            "CFBundleVersion": __version__,
+            "NSHighResolutionCapable": True,
+        }
+    )
     # exec replaces the shell, so the app is this Python process; --show opens the window
     # (a second launch only asks the running copy to show its window).
-    script = f'#!/bin/sh\nexec {quoted} --show "$@"\n'.encode("utf-8")
-    return {"Contents/Info.plist": info, "Contents/MacOS/PaperNym": script,
-            "Contents/Resources/PaperNym.icns": icns(icon_path().read_bytes())}
+    script = f'#!/bin/sh\nexec {quoted} --show "$@"\n'.encode()
+    return {
+        "Contents/Info.plist": info,
+        "Contents/MacOS/PaperNym": script,
+        "Contents/Resources/PaperNym.icns": icns(icon_path().read_bytes()),
+    }
 
 
 def needs_menu_entry() -> bool:
@@ -218,8 +233,9 @@ def take_installer_choice() -> bool | None:
     import winreg
 
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, APP_KEY, 0,
-                            winreg.KEY_READ | winreg.KEY_SET_VALUE) as key:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, APP_KEY, 0, winreg.KEY_READ | winreg.KEY_SET_VALUE
+        ) as key:
             value, _ = winreg.QueryValueEx(key, INSTALLER_VALUE)
             winreg.DeleteValue(key, INSTALLER_VALUE)
     except OSError:

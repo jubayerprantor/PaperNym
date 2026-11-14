@@ -15,23 +15,54 @@ ICONS = Path(__file__).resolve().parent / "icons"
 TRAY_STATES = ("watching", "paused", "working", "attention", "error")
 
 # Plain-text status names: status is never shown by colour alone.
-EVENT_STATUS = {"renamed": "Renamed", "needs_check": "Check", "unidentified": "Not identified",
-                "undo": "Undone", "busy": "Busy", "skipped": "Skipped", "preview": "Preview"}
-FILE_STATUS = {"ok": "Named", "check": "Check (offline guess)", "unknown": "Not identified",
-               "pending": "Rename pending", "unreadable": "Unreadable"}
-REASONS = {"check": "Named from the PDF alone while services were unreachable; will be re-checked.",
-           "unknown": "No source could identify this paper.",
-           "pending": "Identified, but the file was locked; the rename will be retried.",
-           "unreadable": "The PDF is password-protected or damaged."}
+EVENT_STATUS = {
+    "renamed": "Renamed",
+    "needs_check": "Check",
+    "unidentified": "Not identified",
+    "undo": "Undone",
+    "busy": "Busy",
+    "skipped": "Skipped",
+    "preview": "Preview",
+}
+FILE_STATUS = {
+    "ok": "Named",
+    "check": "Check (offline guess)",
+    "unknown": "Not identified",
+    "pending": "Rename pending",
+    "unreadable": "Unreadable",
+}
+REASONS = {
+    "check": "Named from the PDF alone while services were unreachable; will be re-checked.",
+    "unknown": "No source could identify this paper.",
+    "pending": "Identified, but the file was locked; the rename will be retried.",
+    "unreadable": "The PDF is password-protected or damaged.",
+}
 
 SAMPLE_PAPERS = (
-    {"title": "Deep learning for crash severity prediction", "year": 2025, "year_online": 2024,
-     "authors": ["Smith", "Jones", "Lee"], "journal": "Accid Anal Prev", "source": "sample"},
-    {"title": "Attention is all you need", "year": 2017, "year_online": 2017,
-     "authors": ["Vaswani", "Shazeer"], "journal": "NeurIPS", "source": "sample"},
-    {"title": "Short-term demand forecasting in mobility-on-demand systems: a systematic review",
-     "year": 2027, "year_online": 2026, "authors": ["Li"], "journal": "Transp Res Part C",
-     "source": "sample"},
+    {
+        "title": "Deep learning for crash severity prediction",
+        "year": 2025,
+        "year_online": 2024,
+        "authors": ["Smith", "Jones", "Lee"],
+        "journal": "Accid Anal Prev",
+        "source": "sample",
+    },
+    {
+        "title": "Attention is all you need",
+        "year": 2017,
+        "year_online": 2017,
+        "authors": ["Vaswani", "Shazeer"],
+        "journal": "NeurIPS",
+        "source": "sample",
+    },
+    {
+        "title": "Short-term demand forecasting in mobility-on-demand systems: a systematic review",
+        "year": 2027,
+        "year_online": 2026,
+        "authors": ["Li"],
+        "journal": "Transp Res Part C",
+        "source": "sample",
+    },
 )
 
 
@@ -58,8 +89,12 @@ def _select_in_file_manager(path: Path) -> bool:
     bus = QDBusConnection.sessionBus()
     if not bus.isConnected():
         return False
-    manager = QDBusInterface("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
-                             "org.freedesktop.FileManager1", bus)
+    manager = QDBusInterface(
+        "org.freedesktop.FileManager1",
+        "/org/freedesktop/FileManager1",
+        "org.freedesktop.FileManager1",
+        bus,
+    )
     if not manager.isValid():
         return False
     reply = manager.call("ShowItems", [path.resolve().as_uri()], "")
@@ -102,4 +137,3 @@ class LinkLabel(QLabel):
         if event.type() == QEvent.PaletteChange:
             self._paint()
         super().changeEvent(event)
-

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
-import os
 from pathlib import Path
-
 
 TOKENS = frozenset({"year", "author", "authors", "title", "shorttitle", "journal"})
 _TAGS = re.compile(r"<[^>]*>")
@@ -54,9 +53,9 @@ def validate_template(template: str) -> list[str]:
             raise TemplateError("unbalanced braces")
         if char == "{":
             end = template.find("}", index + 1)
-            if end < 0 or "{" in template[index + 1:end]:
+            if end < 0 or "{" in template[index + 1 : end]:
                 raise TemplateError("unbalanced or nested braces")
-            token = template[index + 1:end]
+            token = template[index + 1 : end]
             if token not in TOKENS:
                 raise TemplateError(f"unknown token: {{{token}}}")
             tokens.append(token)
@@ -70,8 +69,25 @@ def validate_template(template: str) -> list[str]:
         raise TemplateError("template needs at least one token")
     if len(fixed) > 60:
         raise TemplateError("fixed text must be at most 60 characters")
-    return ([] if "title" in tokens or "shorttitle" in tokens else
-            ["Template has no title token; names may collide."])
+    return (
+        []
+        if "title" in tokens or "shorttitle" in tokens
+        else ["Template has no title token; names may collide."]
+    )
+
+
+_TRANSLITERATIONS = str.maketrans(
+    {
+        "æ": "ae",
+        "œ": "oe",
+        "ß": "ss",
+        "Æ": "Ae",
+        "Œ": "Oe",
+        "–": " ",
+        "—": " ",
+        "−": "-",
+    }
+)
 
 
 def clean_field(value: object, word_sep: str = "_") -> str:
@@ -79,9 +95,10 @@ def clean_field(value: object, word_sep: str = "_") -> str:
     if word_sep not in ("_", " ", "-", ""):
         raise ValueError("word_sep must be _, space, -, or empty")
     raw = _TAGS.sub("", str(value or ""))
-    folded = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode()
+    cleaned = raw.translate(_TRANSLITERATIONS)
+    folded = unicodedata.normalize("NFKD", cleaned).encode("ascii", "ignore").decode()
     text = folded if folded.strip() else raw
-    text = text.replace("'", "").replace("’", "")
+    text = text.replace("'", "").replace("’", "").replace("‘", "")
     text = "".join(ch if ch.isalnum() or ch in "- " else " " for ch in text)
     return word_sep.join(text.split())
 
@@ -130,8 +147,9 @@ def render_preset(name: str, meta: dict, year_mode: str = "citation") -> str:
     return _render_stem(template, values) + ".pdf"
 
 
-def render_custom(template: str, meta: dict, word_sep: str = "_",
-                  year_mode: str = "citation") -> str:
+def render_custom(
+    template: str, meta: dict, word_sep: str = "_", year_mode: str = "citation"
+) -> str:
     """Render a validated custom template, preserving its fixed text."""
     validate_template(template)
     values = token_values(meta, year_mode, word_sep)
@@ -168,9 +186,18 @@ def _hard_cut(value: str, room: int, windows: bool) -> str:
     return out
 
 
-def build_name(meta: dict, template: str, folder: str | Path, *, word_sep: str = "_",
-               year_mode: str = "citation", title_limit: int = 0, suffix: str = "",
-               windows: bool | None = None, reserve: int = 6) -> str:
+def build_name(
+    meta: dict,
+    template: str,
+    folder: str | Path,
+    *,
+    word_sep: str = "_",
+    year_mode: str = "citation",
+    title_limit: int = 0,
+    suffix: str = "",
+    windows: bool | None = None,
+    reserve: int = 6,
+) -> str:
     """Render a preset name or custom template within the platform budget."""
     windows = os.name == "nt" if windows is None else windows
     citekey = template == "citekey"
@@ -215,14 +242,27 @@ def _letter(index: int) -> str:
     return result
 
 
-def unique_path(folder: str | Path, meta: dict, template: str, *, paper_id: str | None,
-                fingerprint: str | None, known: dict[str, tuple[str | None, str | None]] | None = None,
-                current: str | Path | None = None, word_sep: str = "_", year_mode: str = "citation",
-                title_limit: int = 0, suffix: str = "", windows: bool | None = None) -> Path:
+def unique_path(
+    folder: str | Path,
+    meta: dict,
+    template: str,
+    *,
+    paper_id: str | None,
+    fingerprint: str | None,
+    known: dict[str, tuple[str | None, str | None]] | None = None,
+    current: str | Path | None = None,
+    word_sep: str = "_",
+    year_mode: str = "citation",
+    title_limit: int = 0,
+    suffix: str = "",
+    windows: bool | None = None,
+) -> Path:
     """Choose a free path without overwriting any existing or planned file."""
     folder = Path(folder)
     windows = os.name == "nt" if windows is None else windows
-    identities = {os.path.normcase(os.path.abspath(path)): value for path, value in (known or {}).items()}
+    identities = {
+        os.path.normcase(os.path.abspath(path)): value for path, value in (known or {}).items()
+    }
     current_key = os.path.normcase(os.path.abspath(current)) if current is not None else None
     limit = name_budget(folder, windows)
 
@@ -245,8 +285,16 @@ def unique_path(folder: str | Path, meta: dict, template: str, *, paper_id: str 
         stem = _hard_cut(stem.removesuffix(suffix), room, windows).rstrip(" ._-")
         return folder / f"{stem}{ending}{suffix}.pdf"
 
-    base = build_name(meta, template, folder, word_sep=word_sep, year_mode=year_mode,
-                      title_limit=title_limit, suffix=suffix, windows=windows)
+    base = build_name(
+        meta,
+        template,
+        folder,
+        word_sep=word_sep,
+        year_mode=year_mode,
+        title_limit=title_limit,
+        suffix=suffix,
+        windows=windows,
+    )
     candidate = folder / base
     conflict = owner(candidate)
     if conflict in (None, "current"):
@@ -259,13 +307,24 @@ def unique_path(folder: str | Path, meta: dict, template: str, *, paper_id: str 
         raise NameBudgetError("too many duplicate names")
 
     title_words = clean_field(meta.get("title", ""), " ").split()
-    if "{title}" in PRESETS.get(template, (template,))[0] or "{shorttitle}" in PRESETS.get(template, (template,))[0]:
+    if (
+        "{title}" in PRESETS.get(template, (template,))[0]
+        or "{shorttitle}" in PRESETS.get(template, (template,))[0]
+    ):
         for count in range(1, len(title_words) + 1):
             extension_room = _measure(word_sep.join(title_words[:count]), windows)
             try:
-                extended = build_name(meta, template, folder, word_sep=word_sep,
-                                      year_mode=year_mode, title_limit=max(title_limit, extension_room),
-                                      suffix=suffix, windows=windows, reserve=0)
+                extended = build_name(
+                    meta,
+                    template,
+                    folder,
+                    word_sep=word_sep,
+                    year_mode=year_mode,
+                    title_limit=max(title_limit, extension_room),
+                    suffix=suffix,
+                    windows=windows,
+                    reserve=0,
+                )
             except NameBudgetError:
                 break
             candidate = folder / extended
@@ -278,3 +337,48 @@ def unique_path(folder: str | Path, meta: dict, template: str, *, paper_id: str 
         if owner(candidate) is None:
             return candidate
     raise NameBudgetError("too many colliding names")
+
+
+def to_bibtex(meta: dict, paper_id: str = "") -> str:
+    """Format paper metadata as a standard BibTeX entry."""
+    title = str(meta.get("title") or "").strip()
+    year = meta.get("year") or ""
+    authors = meta.get("authors") or []
+    journal = str(meta.get("journal") or "").strip()
+
+    def _fold(txt: str) -> str:
+        c = str(txt or "").translate(_TRANSLITERATIONS)
+        return unicodedata.normalize("NFKD", c).encode("ascii", "ignore").decode()
+
+    first_author = authors[0] if authors else "unknown"
+    clean_author = "".join(ch for ch in _fold(first_author) if ch.isalnum()).lower() or "author"
+    first_title_word = next(
+        (word.lower() for word in re.findall(r"[A-Za-z0-9]+", _fold(title)) if len(word) > 3),
+        "paper",
+    )
+    citekey = f"{clean_author}{year}{first_title_word}"
+
+    fields = []
+    if title:
+        fields.append(f"  title = {{{title}}}")
+    if authors:
+        author_str = " and ".join(str(a) for a in authors)
+        fields.append(f"  author = {{{author_str}}}")
+    if journal:
+        fields.append(f"  journal = {{{journal}}}")
+    if year:
+        fields.append(f"  year = {{{year}}}")
+
+    pid = str(paper_id or meta.get("paper_id") or "")
+    if pid.startswith("doi:"):
+        fields.append(f"  doi = {{{pid[4:]}}}")
+    elif pid.startswith("arxiv:"):
+        fields.append(f"  eprint = {{{pid[6:]}}}")
+        fields.append("  archivePrefix = {arXiv}")
+    elif pid.startswith("pmid:"):
+        fields.append(f"  eprint = {{{pid[5:]}}}")
+        fields.append("  eprinttype = {pubmed}")
+
+    entry_type = "article" if journal else "misc"
+    inner = ",\n".join(fields)
+    return f"@{entry_type}{{{citekey},\n{inner}\n}}"

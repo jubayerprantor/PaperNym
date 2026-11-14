@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMenu, QPushButton, QTableView, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QPushButton,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 PAGE_SIZE = 200
 
@@ -51,9 +62,16 @@ class PagedTable(QWidget):
     selection_changed = Signal()
     activated = Signal(dict)
 
-    def __init__(self, columns, *, name: str, search_text: Callable[[dict], str],
-                 statuses: list[str] | None = None, status_of: Callable[[dict], str] | None = None,
-                 page_size: int = PAGE_SIZE):
+    def __init__(
+        self,
+        columns,
+        *,
+        name: str,
+        search_text: Callable[[dict], str],
+        statuses: list[str] | None = None,
+        status_of: Callable[[dict], str] | None = None,
+        page_size: int = PAGE_SIZE,
+    ):
         super().__init__()
         self.search_text = search_text
         self.status_of = status_of
@@ -104,7 +122,9 @@ class PagedTable(QWidget):
         self.view.customContextMenuRequested.connect(self._menu)
         self.view.doubleClicked.connect(lambda _: self._activate())
         self.view.activated.connect(lambda _: self._activate())  # Enter key
-        self.view.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit())
+        self.view.selectionModel().selectionChanged.connect(
+            lambda *_: self.selection_changed.emit()
+        )
         layout.addWidget(self.view)
         pager = QHBoxLayout()
         self.first_button = QPushButton("<< First")
@@ -113,8 +133,12 @@ class PagedTable(QWidget):
         self.last_button = QPushButton("Last >>")
         self.position = QLabel()
         self.position.setAccessibleName("Page position")
-        for button, step in ((self.first_button, "first"), (self.prev_button, -1),
-                             (self.next_button, 1), (self.last_button, "last")):
+        for button, step in (
+            (self.first_button, "first"),
+            (self.prev_button, -1),
+            (self.next_button, 1),
+            (self.last_button, "last"),
+        ):
             button.clicked.connect(lambda _=False, s=step: self._go(s))
         pager.addWidget(self.position, 1)
         for button in (self.first_button, self.prev_button, self.next_button, self.last_button):
@@ -138,9 +162,12 @@ class PagedTable(QWidget):
         selected = self.current()
         needle = self.search.text().strip().lower()
         wanted = self.status.currentData() if self.status else None
-        self.matches = [row for row in self.all_rows
-                        if (not needle or needle in self.search_text(row).lower())
-                        and (wanted is None or self.status_of(row) == wanted)]
+        self.matches = [
+            row
+            for row in self.all_rows
+            if (not needle or needle in self.search_text(row).lower())
+            and (wanted is None or self.status_of(row) == wanted)
+        ]
         if reset_page:
             self.page = 0
         self.page = min(self.page, max(0, (len(self.matches) - 1) // self.page_size))
@@ -148,7 +175,7 @@ class PagedTable(QWidget):
 
     def _show_page(self, keep: dict | None = None):
         start = self.page * self.page_size
-        rows = self.matches[start:start + self.page_size]
+        rows = self.matches[start : start + self.page_size]
         self.model.set_rows(rows)
         if keep is not None:
             for index, row in enumerate(rows):
@@ -182,7 +209,11 @@ class PagedTable(QWidget):
     # Selection and actions -----------------------------------------------------------
     def current(self) -> dict | None:
         rows = self.view.selectionModel().selectedRows() if self.view.selectionModel() else []
-        return self.model.rows[rows[0].row()] if rows and rows[0].row() < len(self.model.rows) else None
+        return (
+            self.model.rows[rows[0].row()]
+            if rows and rows[0].row() < len(self.model.rows)
+            else None
+        )
 
     def set_actions(self, actions: list[tuple[str, Callable]]):
         """Actions for the right-click menu; the first is also run by double-click / Enter."""

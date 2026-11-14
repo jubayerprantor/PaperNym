@@ -15,10 +15,16 @@ def arxiv_lookup(aid, _config, http_get):
         if entry is None:
             return None
         published = entry.findtext("a:published", default="", namespaces=ns)
-        return record(entry.findtext("a:title", default="", namespaces=ns),
-                      published[:4],
-                      [surname(author.findtext("a:name", default="", namespaces=ns))
-                       for author in entry.findall("a:author", ns)],
-                      "arXiv", "arxiv", published[:4])
+        return record(
+            entry.findtext("a:title", default="", namespaces=ns),
+            published[:4],
+            [
+                surname(author.findtext("a:name", default="", namespaces=ns))
+                for author in entry.findall("a:author", ns)
+            ],
+            "arXiv",
+            "arxiv",
+            published[:4],
+        )
     except (ET.ParseError, ValueError):
         return None

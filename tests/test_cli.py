@@ -8,19 +8,20 @@ import pytest
 
 from papernym.cli import main
 from papernym.core.config import load_config
-from papernym.core.db import Database
 from papernym.core.lock import WriterLock
 from papernym.core.naming import PRESETS
 from papernym.core.sources.http import NetError
 
 from .pdf_factory import make_pdf
 
-
 DOI = "10.1234/abcd.5678"
 TITLE = "Graph models of crash severity at rural intersections"
-CSL = {"title": [TITLE], "issued": {"date-parts": [[2025]]},
-       "author": [{"given": "Ann", "family": "Smith"}, {"family": "Jones"}],
-       "container-title": ["Journal of Testing"]}
+CSL = {
+    "title": [TITLE],
+    "issued": {"date-parts": [[2025]]},
+    "author": [{"given": "Ann", "family": "Smith"}, {"family": "Jones"}],
+    "container-title": ["Journal of Testing"],
+}
 
 
 def fake_http(url, params=None, headers=None, kind="json"):
@@ -52,8 +53,11 @@ def run(capsys, *argv, http=fake_http):
 
 
 def paper_pdf(path, *, doi=True, title=TITLE):
-    lines = [(title, 18, 72, 700, False), ("Ann Smith and Bob Jones", 11, 72, 670, False),
-             ("Abstract. We study crash severity with graph models.", 10, 72, 640, False)]
+    lines = [
+        (title, 18, 72, 700, False),
+        ("Ann Smith and Bob Jones", 11, 72, 670, False),
+        ("Abstract. We study crash severity with graph models.", 10, 72, 640, False),
+    ]
     if doi:
         lines.append((f"https://doi.org/{DOI}", 9, 72, 60, False))
     make_pdf(path, [lines])
@@ -67,20 +71,23 @@ EXPECTED = "2025_Smith_Graph_models_of_crash_severity_at_rural_intersections.pdf
 
 # Usage and help -----------------------------------------------------------------
 
+
 def test_no_arguments_prints_help(home, capsys):
     code, out, _ = run(capsys)
     assert code == 0
     assert "add-folder" in out and "test-apis" in out
 
 
-@pytest.mark.parametrize("argv", [["bogus"], ["set-year", "later"], 
-                                  ["fix", "a.pdf"], ["undo", "--last", "0"]])
+@pytest.mark.parametrize(
+    "argv", [["bogus"], ["set-year", "later"], ["fix", "a.pdf"], ["undo", "--last", "0"]]
+)
 def test_usage_errors_exit_2(home, capsys, argv):
     code, _, _ = run(capsys, *argv)
     assert code == 2
 
 
 # Settings commands --------------------------------------------------------------
+
 
 def test_add_and_remove_folder(home, papers, capsys):
     code, out, _ = run(capsys, "add-folder", str(papers))
@@ -140,7 +147,9 @@ def test_set_key_without_a_credential_store_warns_and_keeps_config(home, capsys,
     monkeypatch.setenv("PAPERNYM_KEYRING", "off")
     code, out, _ = run(capsys, "set-key", "openalex", "abc123")
     assert code == 0 and "no system credential store" in out
-    assert json.loads((home / "config.json").read_text(encoding="utf-8"))["openalex_key"] == "abc123"
+    assert (
+        json.loads((home / "config.json").read_text(encoding="utf-8"))["openalex_key"] == "abc123"
+    )
 
 
 def test_set_email(home, capsys):
@@ -165,7 +174,9 @@ def test_set_format_preset_and_custom(home, capsys):
     assert code == 0 and load_config(home)["format"] == "citekey"
     code, out, _ = run(capsys, "set-format", "author_year")
     assert code == 0 and "[warn]" in out
-    code, out, _ = run(capsys, "set-format", "--custom", "[{journal}] {author} {year}", "--word-sep", "space")
+    code, out, _ = run(
+        capsys, "set-format", "--custom", "[{journal}] {author} {year}", "--word-sep", "space"
+    )
     assert code == 0 and "[warn]" in out  # no title token
     config = load_config(home)
     assert config["format"] == "[{journal}] {author} {year}" and config["word_sep"] == " "
@@ -200,6 +211,7 @@ def test_invalid_config_reports_failure(home, capsys):
 
 
 # Renaming commands --------------------------------------------------------------
+
 
 def test_menu_entry_on_linux(home, tmp_path, capsys, monkeypatch):
     import sys
@@ -259,7 +271,9 @@ def test_dry_run_then_scan_then_undo(home, papers, capsys):
     assert f"[ok] download.pdf -> {EXPECTED}" in out
     assert out.strip().splitlines()[-1].startswith("Summary: 1 PDFs, 1 named")
     assert (papers / EXPECTED).exists() and not pdf.exists()
-    assert f"[ok] download.pdf -> {EXPECTED}" in (home / "logs" / "papernym.log").read_text(encoding="utf-8")
+    assert f"[ok] download.pdf -> {EXPECTED}" in (home / "logs" / "papernym.log").read_text(
+        encoding="utf-8"
+    )
     code, out, _ = run(capsys, "undo")
     assert code == 0 and f"[undo] {EXPECTED} -> download.pdf" in out
     assert pdf.exists()
@@ -349,15 +363,37 @@ def test_outage_reports_source_warning(home, papers, capsys):
 
 # Diagnostics --------------------------------------------------------------------
 
-S2 = {"title": "Mastering the game of Go with deep neural networks and tree search", "year": 2016,
-      "authors": [{"name": "David Silver"}], "venue": "Nature", "publicationDate": "2016-01-27"}
-S2_ARXIV = {"title": "Attention is all you need", "year": 2017,
-            "authors": [{"name": "Ashish Vaswani"}], "venue": "NeurIPS", "publicationDate": "2017-06-12"}
-GO_CSL = {"title": [S2["title"]], "issued": {"date-parts": [[2016]]}, "author": [{"family": "Silver"}]}
-ARXIV_CSL = {"title": "Attention is all you need", "issued": {"date-parts": [[2017]]},
-             "author": [{"family": "Vaswani"}]}
+S2 = {
+    "title": "Mastering the game of Go with deep neural networks and tree search",
+    "year": 2016,
+    "authors": [{"name": "David Silver"}],
+    "venue": "Nature",
+    "publicationDate": "2016-01-27",
+}
+S2_ARXIV = {
+    "title": "Attention is all you need",
+    "year": 2017,
+    "authors": [{"name": "Ashish Vaswani"}],
+    "venue": "NeurIPS",
+    "publicationDate": "2017-06-12",
+}
+GO_CSL = {
+    "title": [S2["title"]],
+    "issued": {"date-parts": [[2016]]},
+    "author": [{"family": "Silver"}],
+}
+ARXIV_CSL = {
+    "title": "Attention is all you need",
+    "issued": {"date-parts": [[2017]]},
+    "author": [{"family": "Vaswani"}],
+}
 ATOM = """<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Attention is all you need</title>
 <published>2017-06-12T00:00:00Z</published><author><name>Ashish Vaswani</name></author></entry></feed>"""
+EPMC_GO = {
+    "title": "Mastering the game of Go with deep neural networks and tree search.",
+    "pubYear": "2016",
+    "authorList": {"author": [{"lastName": "Silver"}]},
+}
 
 
 def healthy_http(url, params=None, headers=None, kind="json"):
@@ -377,14 +413,16 @@ def healthy_http(url, params=None, headers=None, kind="json"):
         return S2
     if "export.arxiv.org" in url:
         return ATOM
+    if "ebi.ac.uk" in url or "europepmc" in url:
+        return {"resultList": {"result": [EPMC_GO]}}
     return None
 
 
 def test_test_apis_pass_and_skip(home, capsys):
     code, out, _ = run(capsys, "test-apis", http=healthy_http)
     assert code == 0, out
-    assert out.count("[ok] PASS") == 8 and out.count("[skip] SKIP") == 2
-    assert "Summary: 8 passed, 0 failed, 2 skipped" in out
+    assert out.count("[ok] PASS") == 10 and out.count("[skip] SKIP") == 2
+    assert "Summary: 10 passed, 0 failed, 2 skipped" in out
 
 
 def test_test_apis_failures(home, capsys):
@@ -455,7 +493,9 @@ def test_scan_one_folder_without_watching_it(home, papers, capsys, monkeypatch):
     paper_pdf(sub / "download.pdf")
     monkeypatch.chdir(papers)
     code, out, _ = run(capsys, "scan", ".", "--dry-run")
-    assert code == 0 and "(with subfolders)" in out and f"[preview] download.pdf -> {EXPECTED}" in out
+    assert (
+        code == 0 and "(with subfolders)" in out and f"[preview] download.pdf -> {EXPECTED}" in out
+    )
     code, out, _ = run(capsys, "scan", ".", "--no-subfolders")
     assert code == 0 and "Summary: 0 PDFs" in out and (sub / "download.pdf").exists()
     code, out, _ = run(capsys, "scan", ".")

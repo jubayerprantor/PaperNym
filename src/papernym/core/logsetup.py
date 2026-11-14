@@ -25,8 +25,9 @@ def setup_file_log(home: Path, level: int = logging.INFO) -> None:
             handler.close()
     try:
         log_path(home).parent.mkdir(parents=True, exist_ok=True)
-        handler = logging.handlers.RotatingFileHandler(target, maxBytes=1_000_000, backupCount=4,
-                                                       encoding="utf-8")
+        handler = logging.handlers.RotatingFileHandler(
+            target, maxBytes=1_000_000, backupCount=4, encoding="utf-8"
+        )
     except OSError:
         return
     handler._papernym = True

@@ -26,7 +26,7 @@ FIRST_CHECK_AFTER_MS = 30_000
 @dataclass
 class UpdateInfo:
     current: str
-    latest: str | None = None     # None: no release published yet
+    latest: str | None = None  # None: no release published yet
     url: str = RELEASES_URL
     newer: bool = False
 

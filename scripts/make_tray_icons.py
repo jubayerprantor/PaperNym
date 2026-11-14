@@ -1,10 +1,10 @@
 r"""Crop the supplied tray sheet into one PNG per tray state (run once after art changes).
 
-    .venv\Scripts\python.exe scripts\make_tray_icons.py
+.venv\Scripts\python.exe scripts\make_tray_icons.py
 """
 
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from PySide6.QtGui import QImage
 

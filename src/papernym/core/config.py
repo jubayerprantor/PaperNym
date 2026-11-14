@@ -8,17 +8,19 @@ import os
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from .keystore import SECRET_KEYS, SecretStore, SecretStoreError
 from .naming import PRESETS, TemplateError, validate_template
 
-
 log = logging.getLogger("papernym")
 
 # Settings that no longer exist; old config.json files may still have them (dropped on load).
-RETIRED = {"title_limit", "max_title_chars"}  # titles are always as long as the file-name budget allows (max_title_chars: the prototype's name)
+RETIRED = {
+    "title_limit",
+    "max_title_chars",
+}  # titles are always as long as the file-name budget allows (max_title_chars: the prototype's name)
 
 DEFAULTS = {
     "folders": [],
@@ -37,6 +39,7 @@ DEFAULTS = {
     "update_check": True,
     "skipped_version": "",
 }
+
 
 class ConfigError(ValueError):
     """Settings could not be loaded or validated."""
@@ -57,7 +60,9 @@ def settings_dir(home: str | Path | None = None) -> Path:
 
 def default_config() -> dict:
     """Return independent mutable defaults for each caller."""
-    return {key: value.copy() if isinstance(value, list) else value for key, value in DEFAULTS.items()}
+    return {
+        key: value.copy() if isinstance(value, list) else value for key, value in DEFAULTS.items()
+    }
 
 
 def _validate_template(template: str) -> None:
@@ -82,11 +87,17 @@ def validate_config(config: dict) -> dict:
     if not isinstance(result["folders"], list):
         raise ConfigError("folders must be a list")
     for folder in result["folders"]:
-        if (not isinstance(folder, dict) or set(folder) != {"path", "recursive"}
-                or not isinstance(folder["path"], str) or not folder["path"]
-                or type(folder["recursive"]) is not bool):
+        if (
+            not isinstance(folder, dict)
+            or set(folder) != {"path", "recursive"}
+            or not isinstance(folder["path"], str)
+            or not folder["path"]
+            or type(folder["recursive"]) is not bool
+        ):
             raise ConfigError("each folder needs a nonempty path and boolean recursive")
-    if not isinstance(result["exclude"], list) or any(not isinstance(x, str) for x in result["exclude"]):
+    if not isinstance(result["exclude"], list) or any(
+        not isinstance(x, str) for x in result["exclude"]
+    ):
         raise ConfigError("exclude must be a list of strings")
     if not isinstance(result["format"], str):
         raise ConfigError("format must be a string")
@@ -173,14 +184,17 @@ def save_config(config: dict, home: str | Path | None = None) -> None:
             try:
                 store.set(key, validated[key])
             except SecretStoreError as exc:
-                raise ConfigError(f"{exc}. Set {SECRET_KEYS[key]} in the environment instead, "
-                                  "or PAPERNYM_KEYRING=off to keep keys in config.json.") from exc
+                raise ConfigError(
+                    f"{exc}. Set {SECRET_KEYS[key]} in the environment instead, "
+                    "or PAPERNYM_KEYRING=off to keep keys in config.json."
+                ) from exc
             validated[key] = ""
     path = directory / "config.json"
     temp_path = None
     try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory,
-                                         prefix=".config-", suffix=".tmp", delete=False) as stream:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=directory, prefix=".config-", suffix=".tmp", delete=False
+        ) as stream:
             temp_path = Path(stream.name)
             json.dump(validated, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
@@ -203,16 +217,27 @@ def _within(child: str | Path, parent: str | Path) -> bool:
         return False
 
 
-def add_folder(config: dict, path: str | Path, *, recursive: bool = True,
-               on_warning: Callable[[str], None] | None = None) -> dict:
+def add_folder(
+    config: dict,
+    path: str | Path,
+    *,
+    recursive: bool = True,
+    on_warning: Callable[[str], None] | None = None,
+) -> dict:
     """Return settings with a folder added, merged, or rejected for overlap."""
     root = Path(path).expanduser().resolve()
     if not root.is_dir():
         raise ConfigError(f"not a folder: {root}")
     result = validate_config(config)
     folders = [dict(folder) for folder in result["folders"]]
-    same = next((folder for folder in folders if _within(root, folder["path"])
-                 and _within(folder["path"], root)), None)
+    same = next(
+        (
+            folder
+            for folder in folders
+            if _within(root, folder["path"]) and _within(folder["path"], root)
+        ),
+        None,
+    )
     if same:
         folders.remove(same)
     for folder in folders:
@@ -225,5 +250,7 @@ def add_folder(config: dict, path: str | Path, *, recursive: bool = True,
     lower = str(root).replace("\\", "/").lower()
     if "zotero/storage" in lower or "mendeley" in lower or "endnote" in lower:
         if on_warning:
-            on_warning("Reference-manager storage detected; renaming files there may break its links.")
+            on_warning(
+                "Reference-manager storage detected; renaming files there may break its links."
+            )
     return result

@@ -14,14 +14,25 @@ from .test_engine import FakeIdentifier, engine, outcome
 
 def test_different_pdf_same_doi_reuses_paper_cache(tmp_path):
     title = "A detailed study of crash severity"
-    info = {"text": (title + " 10.1234/paper ") * 8, "page1": title,
-            "md_dois": ["10.1234/paper"], "big_title": "", "md_title": "", "paperish": True}
+    info = {
+        "text": (title + " 10.1234/paper ") * 8,
+        "page1": title,
+        "md_dois": ["10.1234/paper"],
+        "big_title": "",
+        "md_title": "",
+        "paperish": True,
+    }
     calls = []
 
     def get(url, **_kwargs):
         calls.append(url)
-        return {"message": {"title": [title], "author": [{"family": "Smith"}],
-                            "issued": {"date-parts": [[2025]]}}}
+        return {
+            "message": {
+                "title": [title],
+                "author": [{"family": "Smith"}],
+                "issued": {"date-parts": [[2025]]},
+            }
+        }
 
     first, second = tmp_path / "one.pdf", tmp_path / "two.pdf"
     first.write_bytes(b"publisher PDF")
@@ -40,8 +51,19 @@ def test_different_pdf_same_doi_reuses_paper_cache(tmp_path):
 def test_check_file_auto_corrects_on_retry(tmp_path):
     path = tmp_path / "paper.pdf"
     path.write_bytes(b"PDF")
-    fake = FakeIdentifier(outcome("check", {"title": "A useful research article", "year": 2025,
-        "year_online": 2025, "authors": ["Smith"], "journal": "", "source": "pdf-only"}))
+    fake = FakeIdentifier(
+        outcome(
+            "check",
+            {
+                "title": "A useful research article",
+                "year": 2025,
+                "year_online": 2025,
+                "authors": ["Smith"],
+                "journal": "",
+                "source": "pdf-only",
+            },
+        )
+    )
     with Database(tmp_path / "home") as db:
         worker = engine(db, fake)
         checked = worker.process(path)
@@ -80,11 +102,24 @@ def test_unknown_stops_after_five_reached_attempts(tmp_path):
 
 def test_scanned_pdf_with_property_doi_is_trusted():
     title = "A paper whose pages have no text"
-    info = {"text": "", "page1": "", "md_dois": ["10.1234/scanned"],
-            "big_title": "", "md_title": "", "paperish": True}
+    info = {
+        "text": "",
+        "page1": "",
+        "md_dois": ["10.1234/scanned"],
+        "big_title": "",
+        "md_title": "",
+        "paperish": True,
+    }
+
     def get(_url, **_kwargs):
-        return {"message": {"title": [title], "author": [{"family": "Smith"}],
-                            "issued": {"date-parts": [[2025]]}}}
+        return {
+            "message": {
+                "title": [title],
+                "author": [{"family": "Smith"}],
+                "issued": {"date-parts": [[2025]]},
+            }
+        }
+
     match, _ = Identifier({"title_search": False}, get).identify_online("scan.pdf", info)
     assert match.paper_id == "doi:10.1234/scanned"
 
@@ -94,13 +129,26 @@ def test_invoice_stays_untouched_without_a_lookup(tmp_path):
     path.write_bytes(b"invoice")
     cfg = default_config()
     cfg["title_search"] = False
-    info = {"text": "Invoice for services", "page1": "Invoice for services", "md_dois": [],
-            "big_title": "", "md_title": "", "paperish": False}
+    info = {
+        "text": "Invoice for services",
+        "page1": "Invoice for services",
+        "md_dois": [],
+        "big_title": "",
+        "md_title": "",
+        "paperish": False,
+    }
+
     def forbidden(*_args, **_kwargs):
         raise AssertionError("invoice sent to network")
+
     with Database(tmp_path / "home") as db:
-        worker = Engine(cfg, db, Identifier(cfg, forbidden, db=db),
-                        read_pdf_fn=lambda _: info, stable_fn=lambda _: True)
+        worker = Engine(
+            cfg,
+            db,
+            Identifier(cfg, forbidden, db=db),
+            read_pdf_fn=lambda _: info,
+            stable_fn=lambda _: True,
+        )
         assert worker.process(path).status == "unknown"
         assert path.exists()
 
@@ -121,8 +169,14 @@ def test_interrupted_scan_resumes_without_pruning(tmp_path):
             raise KeyboardInterrupt
 
     with Database(tmp_path / "home") as db:
-        worker = Engine(cfg, db, FakeIdentifier(outcome()), on_event,
-                        read_pdf_fn=lambda _: {}, stable_fn=lambda _: True)
+        worker = Engine(
+            cfg,
+            db,
+            FakeIdentifier(outcome()),
+            on_event,
+            read_pdf_fn=lambda _: {},
+            stable_fn=lambda _: True,
+        )
         with pytest.raises(KeyboardInterrupt):
             worker.scan()
         assert db.conn.execute("SELECT count(*) FROM files").fetchone()[0] == 1
@@ -135,8 +189,10 @@ def test_database_failure_after_rename_restores_original(tmp_path, monkeypatch):
     path.write_bytes(b"PDF")
     with Database(tmp_path / "home") as db:
         worker = engine(db, FakeIdentifier(outcome()))
+
         def fail(*_args, **_kwargs):
             raise sqlite3.OperationalError("simulated write failure")
+
         monkeypatch.setattr(db, "record_rename", fail)
         with pytest.raises(sqlite3.OperationalError):
             worker.process(path)
@@ -168,11 +224,24 @@ def test_preview_does_not_write_online_cache(tmp_path):
     folder.mkdir()
     (folder / "one.pdf").write_bytes(b"PDF")
     title = "A detailed study of road safety"
-    info = {"text": (title + " 10.1234/paper ") * 8, "page1": title,
-            "md_dois": ["10.1234/paper"], "big_title": "", "md_title": "", "paperish": True}
+    info = {
+        "text": (title + " 10.1234/paper ") * 8,
+        "page1": title,
+        "md_dois": ["10.1234/paper"],
+        "big_title": "",
+        "md_title": "",
+        "paperish": True,
+    }
+
     def get(_url, **_kwargs):
-        return {"message": {"title": [title], "author": [{"family": "Smith"}],
-                            "issued": {"date-parts": [[2025]]}}}
+        return {
+            "message": {
+                "title": [title],
+                "author": [{"family": "Smith"}],
+                "issued": {"date-parts": [[2025]]},
+            }
+        }
+
     cfg = default_config()
     cfg["folders"] = [{"path": str(folder), "recursive": True}]
     with Database(tmp_path / "home") as db:

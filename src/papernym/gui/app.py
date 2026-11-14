@@ -16,28 +16,27 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal
-from PySide6.QtGui import QAction
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from ..core import autostart
+from ..core import autostart, updates
 from ..core.config import ConfigError, add_folder, load_config, settings_dir
 from ..core.logsetup import setup_file_log
-from ..core.naming import PRESETS
+from ..core.naming import PRESETS, to_bibtex
+from ..core.sources.http import HttpClient
+from . import theme
 from .common import app_icon, short, show_in_folder, tray_icon
 from .dialogs import PreviewDialog, WelcomeWizard
-from . import theme
-from ..core import updates
-from ..core.sources.http import HttpClient
 from .window import MainWindow
 from .worker import Worker
 
 log = logging.getLogger("papernym")
 REPO_SAMPLES = Path(__file__).resolve().parents[3] / "sample_pdfs"
-TOAST_QUIET_MS = 4000   # one toast after this much quiet...
-TOAST_MAX_WAIT = 20     # ...or at least every 20 s while files keep arriving
-OUTAGE = ("Metadata services unreachable; new papers are marked _CHECK and will be fixed "
-          "automatically.")
+TOAST_QUIET_MS = 4000  # one toast after this much quiet...
+TOAST_MAX_WAIT = 20  # ...or at least every 20 s while files keep arriving
+OUTAGE = (
+    "Metadata services unreachable; new papers are marked _CHECK and will be fixed automatically."
+)
 
 
 class UpdateRelay(QObject):
@@ -53,9 +52,18 @@ class Controller(QObject):
     attention_changed = Signal(list)
     history_changed = Signal()
 
-    def __init__(self, home: Path, *, sandbox: bool = False, welcome_folders: list[str] | None = None,
-                 http_get=None, worker_kwargs: dict | None = None, first_run: bool | None = None,
-                 interactive: bool = True, debug: bool = False):
+    def __init__(
+        self,
+        home: Path,
+        *,
+        sandbox: bool = False,
+        welcome_folders: list[str] | None = None,
+        http_get=None,
+        worker_kwargs: dict | None = None,
+        first_run: bool | None = None,
+        interactive: bool = True,
+        debug: bool = False,
+    ):
         super().__init__()
         self.home = Path(home)
         self.debug = debug  # only debug mode shows where the settings folder is
@@ -63,7 +71,9 @@ class Controller(QObject):
         self.http_get = http_get
         self.interactive = interactive
         self.quitting = False
-        self.first_run = (not (self.home / "config.json").exists()) if first_run is None else first_run
+        self.first_run = (
+            (not (self.home / "config.json").exists()) if first_run is None else first_run
+        )
         self.welcome_folders = welcome_folders or []
         self.config = load_config(self.home, apply_env=False)
         self.scanning = False
@@ -78,14 +88,21 @@ class Controller(QObject):
         self.worker = Worker(self.home, http_get=http_get, **(worker_kwargs or {}))
         self._animation = QTimer(self, interval=600, timeout=self._animate)
         self._refresh = QTimer(self, singleShot=True, interval=300, timeout=self._refresh_lists)
-        self._toast_timer = QTimer(self, singleShot=True, interval=TOAST_QUIET_MS, timeout=self._flush_toast)
+        self._toast_timer = QTimer(
+            self, singleShot=True, interval=TOAST_QUIET_MS, timeout=self._flush_toast
+        )
         self.update_info = None
-        self.login_default = True  # the welcome wizard's Start-at-login tick (the installer may change it)
+        self.login_default = (
+            True  # the welcome wizard's Start-at-login tick (the installer may change it)
+        )
         self._update_checking = False
         self._update_result = UpdateRelay(self)
         self._update_result.finished.connect(self._update_checked)
-        self._update_timer = QTimer(self, interval=updates.CHECK_EVERY_S * 1000,
-                                    timeout=lambda: self.check_updates(manual=False))
+        self._update_timer = QTimer(
+            self,
+            interval=updates.CHECK_EVERY_S * 1000,
+            timeout=lambda: self.check_updates(manual=False),
+        )
         self._theme = None
         self.apply_theme()
         hints = QApplication.styleHints()
@@ -110,11 +127,14 @@ class Controller(QObject):
         self.recent_menu = menu.addMenu("&Recent renames")
         self.recent_menu.aboutToShow.connect(self._fill_recent)
         menu.addAction("&Undo last rename", self.undo_last)
-        self.attention_action = menu.addAction("&Needs attention (0)",
-                                               lambda: self.show_window(self.window.attention))
+        self.attention_action = menu.addAction(
+            "&Needs attention (0)", lambda: self.show_window(self.window.attention)
+        )
         menu.addAction("Se&ttings", lambda: self.show_window(self.window.folders))
         menu.addAction("A&bout PaperNym", lambda: self.show_window(self.window.about))
-        self.update_action = menu.addAction("Update available", lambda: self.show_window(self.window.about))
+        self.update_action = menu.addAction(
+            "Update available", lambda: self.show_window(self.window.about)
+        )
         self.update_action.setVisible(False)
         menu.addSeparator()
         menu.addAction("&Quit", self.quit)
@@ -131,7 +151,7 @@ class Controller(QObject):
         return QSystemTrayIcon.isSystemTrayAvailable()
 
     def _tray_activated(self, reason):
-        wanted = (QSystemTrayIcon.DoubleClick if sys.platform == "win32" else QSystemTrayIcon.Trigger)
+        wanted = QSystemTrayIcon.DoubleClick if sys.platform == "win32" else QSystemTrayIcon.Trigger
         if reason == wanted:
             self.show_window()
 
@@ -169,7 +189,9 @@ class Controller(QObject):
             self._animation.stop()
             self.tray.setIcon(tray_icon(state))
         self.tray.setToolTip(f"PaperNym{' [SANDBOX]' if self.sandbox else ''}: {text}")
-        self.pause_action.setText("&Resume watching" if self.config["paused"] else "&Pause watching")
+        self.pause_action.setText(
+            "&Resume watching" if self.config["paused"] else "&Pause watching"
+        )
         self.attention_action.setText(f"&Needs attention ({self.attention_count})")
         self.window.set_attention_count(self.attention_count)
 
@@ -196,7 +218,9 @@ class Controller(QObject):
         if self.first_run and self.interactive:
             QTimer.singleShot(0, self.run_welcome)
         if self.interactive:
-            QTimer.singleShot(updates.FIRST_CHECK_AFTER_MS, lambda: self.check_updates(manual=False))
+            QTimer.singleShot(
+                updates.FIRST_CHECK_AFTER_MS, lambda: self.check_updates(manual=False)
+            )
             self._update_timer.start()
 
     # Updates -----------------------------------------------------------------------
@@ -231,12 +255,16 @@ class Controller(QObject):
             if manual or info.latest != self.config.get("skipped_version"):
                 self.window.update_banner.show_update(info)
         elif manual and not error:
-            self.status("PaperNym is up to date." if info.latest else "No release has been published yet.")
+            self.status(
+                "PaperNym is up to date." if info.latest else "No release has been published yet."
+            )
 
     def skip_version(self, version: str):
         config = copy.deepcopy(self.config)
         config["skipped_version"] = version
-        self.save_settings(config, lambda _: self.status(f"You will not be reminded about v{version} again."))
+        self.save_settings(
+            config, lambda _: self.status(f"You will not be reminded about v{version} again.")
+        )
 
     def _history_loaded(self, rows):
         self.window.activity.load_history(rows)
@@ -314,7 +342,9 @@ class Controller(QObject):
             title = "Papers need attention"
         if attention:
             lines.append(f"{attention} file(s) need attention; open PaperNym to review.")
-        self.notify(title, "\n".join(line for line in lines if line) or "Open PaperNym to see them.")
+        self.notify(
+            title, "\n".join(line for line in lines if line) or "Open PaperNym to see them."
+        )
 
     def _last_names(self, count: int) -> str:
         return "\n".join(name for _, name in ((o, short(n)) for o, n in self.recent[:count]))
@@ -373,8 +403,11 @@ class Controller(QObject):
             if on_done:
                 on_done(saved)
 
-        self.worker.call(lambda w: w.apply_config(config), done,
-                         lambda message: (self.error(message), self.config_changed.emit(self.config)))
+        self.worker.call(
+            lambda w: w.apply_config(config),
+            done,
+            lambda message: (self.error(message), self.config_changed.emit(self.config)),
+        )
 
     def scan_now(self):
         self.status("Scanning...")
@@ -395,6 +428,47 @@ class Controller(QObject):
         else:
             self.status("Nothing to undo.")
         self._refresh.start()
+
+    def copy_bibtex_for_file(self, path: str):
+        def on_got(result):
+            meta, paper_id = result
+            if not meta:
+                self.status("No scholarly metadata available for this file.")
+                return
+            bib = to_bibtex(meta, paper_id)
+            QApplication.clipboard().setText(bib)
+            self.status("Copied BibTeX citation to clipboard.")
+
+        self.worker.call(lambda w: w.get_paper_for_file(path), on_got, self.error)
+
+    def handle_dropped_files(self, paths: list[str]):
+        """Preview and rename dropped PDF files."""
+        self.status(f"Inspecting {len(paths)} dropped PDF(s)...")
+
+        def on_preview(previews: list[dict]):
+            if not previews:
+                self.status("No rename needed for dropped file(s).")
+                return
+            dialog = PreviewDialog(
+                "Rename dropped PDF(s)",
+                f"PaperNym identified {len(previews)} paper(s). Review the proposed new names:",
+                previews,
+                accept_text="&Rename",
+                parent=self.window,
+            )
+            if dialog.exec():
+                chosen = [item["old_path"] for item in dialog.accepted_items()]
+                if chosen:
+                    self.status(f"Renaming {len(chosen)} file(s)...")
+                    self.worker.call(
+                        lambda w: w.rename_dropped(chosen),
+                        lambda results: self.status(
+                            f"Renamed {sum(1 for r in results if r['status'] in ('ok', 'check'))} dropped file(s)."
+                        ),
+                        self.error,
+                    )
+
+        self.worker.call(lambda w: w.preview_dropped(paths), on_preview, self.error)
 
     def adopt_installer_login(self):
         """Take over the installer's Start-at-login answer (once) as the app setting."""
@@ -429,8 +503,11 @@ class Controller(QObject):
             self.error(f"Could not change start at login: {exc}")
 
     def add_folder_flow(self, path: str, recursive: bool = True):
-        self.worker.call(lambda w: w.validate_new_folder(self.config, path, recursive),
-                         self._confirm_folder, self.error)
+        self.worker.call(
+            lambda w: w.validate_new_folder(self.config, path, recursive),
+            self._confirm_folder,
+            self.error,
+        )
 
     def _confirm_folder(self, info: dict):
         """Nothing is read or looked up until the user adds the folder here."""
@@ -439,9 +516,11 @@ class Controller(QObject):
         text = f"{info['path']}\n\nThis folder contains {info['count']} PDF(s)."
         if info["warnings"]:
             text += "\n\nWarning: " + " ".join(info["warnings"])
-        text += ("\n\nAdd: PaperNym starts watching and renaming here now.\n"
-                 "Add and preview: the folder is added and waits; you see the planned names "
-                 "first and choose which files to rename.")
+        text += (
+            "\n\nAdd: PaperNym starts watching and renaming here now.\n"
+            "Add and preview: the folder is added and waits; you see the planned names "
+            "first and choose which files to rename."
+        )
         box.setText(text)
         now = box.addButton("&Add", QMessageBox.YesRole)
         preview = box.addButton("Add and &preview", QMessageBox.AcceptRole)
@@ -449,24 +528,36 @@ class Controller(QObject):
         box.setDefaultButton(now)
         box.exec()
         if box.clickedButton() is now:
-            self.save_settings(info["config"], lambda _: self.status(f"Added and watching {info['path']}"))
+            self.save_settings(
+                info["config"], lambda _: self.status(f"Added and watching {info['path']}")
+            )
         elif box.clickedButton() is preview:
             path = info["config"]["folders"][-1]["path"]
-            self.status(f"Added {path}; looking up {info['count']} PDF(s) for the preview "
-                        "(nothing is renamed yet)...")
-            self.worker.call(lambda w: w.add_held_folder(info["config"]), self._set_config, self.error)
-            self.worker.call(lambda w: w.preview_held_folder(path),
-                             lambda items: self._preview_added_folder(items, path), self.error)
+            self.status(
+                f"Added {path}; looking up {info['count']} PDF(s) for the preview "
+                "(nothing is renamed yet)..."
+            )
+            self.worker.call(
+                lambda w: w.add_held_folder(info["config"]), self._set_config, self.error
+            )
+            self.worker.call(
+                lambda w: w.preview_held_folder(path),
+                lambda items: self._preview_added_folder(items, path),
+                self.error,
+            )
 
     def _preview_added_folder(self, items: list[dict], path: str):
         self.window.folders.refresh_states()
-        intro = ("The folder is added but nothing has been renamed. Ticked files will be renamed; "
-                 "unticked files keep their names and PaperNym will leave them alone. "
-                 "Closing this window removes the folder again.")
+        intro = (
+            "The folder is added but nothing has been renamed. Ticked files will be renamed; "
+            "unticked files keep their names and PaperNym will leave them alone. "
+            "Closing this window removes the folder again."
+        )
         if not items:
             intro = "No files need renaming here. New PDFs will be renamed as they arrive."
-        dialog = PreviewDialog("Preview renames", intro, items, accept_text="&Rename ticked files",
-                               parent=self.window)
+        dialog = PreviewDialog(
+            "Preview renames", intro, items, accept_text="&Rename ticked files", parent=self.window
+        )
         if dialog.exec():
             rename, keep = dialog.selected(), dialog.unselected()
 
@@ -475,65 +566,107 @@ class Controller(QObject):
                 w.release_folder(path)
                 return counts
 
-            self.worker.call(apply, lambda counts: (
-                self.window.folders.refresh_states(),
-                self.status(f"Watching {path}. Renamed {counts['renamed']}, kept {counts['kept']}.")),
-                self.error)
+            self.worker.call(
+                apply,
+                lambda counts: (
+                    self.window.folders.refresh_states(),
+                    self.status(
+                        f"Watching {path}. Renamed {counts['renamed']}, kept {counts['kept']}."
+                    ),
+                ),
+                self.error,
+            )
         else:
-            self.worker.call(lambda w: w.drop_folder(path), lambda saved: (
-                self._set_config(saved), self.window.folders.refresh_states(),
-                self.status(f"Preview closed; {path} was not added and nothing was renamed.")),
-                self.error)
+            self.worker.call(
+                lambda w: w.drop_folder(path),
+                lambda saved: (
+                    self._set_config(saved),
+                    self.window.folders.refresh_states(),
+                    self.status(f"Preview closed; {path} was not added and nothing was renamed."),
+                ),
+                self.error,
+            )
 
-    def _preview_then_apply(self, items: list[dict], config: dict, *, paused_on_cancel: bool = False):
-        intro = ("Nothing has been renamed yet. Ticked files will be renamed; unticked files keep "
-                 "their names and PaperNym will leave them alone.")
+    def _preview_then_apply(
+        self, items: list[dict], config: dict, *, paused_on_cancel: bool = False
+    ):
+        intro = (
+            "Nothing has been renamed yet. Ticked files will be renamed; unticked files keep "
+            "their names and PaperNym will leave them alone."
+        )
         if not items:
             intro = "No files need renaming here. New PDFs will be renamed as they arrive."
-        dialog = PreviewDialog("Preview renames", intro, items, accept_text="&Rename ticked files",
-                               parent=self.window)
+        dialog = PreviewDialog(
+            "Preview renames", intro, items, accept_text="&Rename ticked files", parent=self.window
+        )
         if dialog.exec():
             rename, keep = dialog.selected(), dialog.unselected()
-            self.worker.call(lambda w: w.apply_selection(rename, keep, config),
-                             lambda counts: (self.reload_config(), self.window.folders.refresh_states(),
-                                             self.status(f"Renamed {counts['renamed']}, kept {counts['kept']}.")),
-                             self.error)
+            self.worker.call(
+                lambda w: w.apply_selection(rename, keep, config),
+                lambda counts: (
+                    self.reload_config(),
+                    self.window.folders.refresh_states(),
+                    self.status(f"Renamed {counts['renamed']}, kept {counts['kept']}."),
+                ),
+                self.error,
+            )
         elif paused_on_cancel:
             config = copy.deepcopy(config)
             config["paused"] = True
-            self.save_settings(config, lambda _: self.window.notice.show_message(
-                "Watching is paused, so nothing was renamed. Resume from the tray menu or the "
-                "General tab when you are ready."))
+            self.save_settings(
+                config,
+                lambda _: self.window.notice.show_message(
+                    "Watching is paused, so nothing was renamed. Resume from the tray menu or the "
+                    "General tab when you are ready."
+                ),
+            )
 
     def offer_reformat(self):
         def counted(count):
             if count:
-                self.worker.call(lambda w: w.preview_reformat(False),
-                                 lambda items: self._reformat_dialog(items, count))
+                self.worker.call(
+                    lambda w: w.preview_reformat(False),
+                    lambda items: self._reformat_dialog(items, count),
+                )
             else:
                 self.status("Naming saved.")
 
         self.worker.call(lambda w: w.tool_named_count(), counted)
 
     def _reformat_dialog(self, items: list[dict], count: int):
-        dialog = PreviewDialog("Apply to existing files?",
-                               f"Apply the new naming to {count} existing file(s) named by PaperNym? "
-                               "Files you renamed by hand are left alone.",
-                               items, checkable=False, accept_text="&Apply", reject_text="&Not now",
-                               include_manual=False, parent=self.window)
-        dialog.include_manual_changed.connect(lambda include: self.worker.call(
-            lambda w: w.preview_reformat(include), dialog.set_items))
+        dialog = PreviewDialog(
+            "Apply to existing files?",
+            f"Apply the new naming to {count} existing file(s) named by PaperNym? "
+            "Files you renamed by hand are left alone.",
+            items,
+            checkable=False,
+            accept_text="&Apply",
+            reject_text="&Not now",
+            include_manual=False,
+            parent=self.window,
+        )
+        dialog.include_manual_changed.connect(
+            lambda include: self.worker.call(
+                lambda w: w.preview_reformat(include), dialog.set_items
+            )
+        )
         if dialog.exec():
             include = dialog.manual_box.isChecked()
-            self.worker.call(lambda w: w.engine.reformat(include_manual=include),
-                             lambda counts: (self.status("Existing files renamed."), self._refresh.start()),
-                             self.error)
+            self.worker.call(
+                lambda w: w.engine.reformat(include_manual=include),
+                lambda counts: (self.status("Existing files renamed."), self._refresh.start()),
+                self.error,
+            )
         else:
             self.status("Naming saved; existing files keep their names.")
 
     def run_welcome(self):
-        wizard = WelcomeWizard(self.welcome_folders, self.window, allow_login=not self.sandbox,
-                               login_default=self.login_default)
+        wizard = WelcomeWizard(
+            self.welcome_folders,
+            self.window,
+            allow_login=not self.sandbox,
+            login_default=self.login_default,
+        )
         if not wizard.exec():
             self.save_settings(self.config, lambda _: self.status("Add a folder to start."))
             return
@@ -545,11 +678,21 @@ class Controller(QObject):
         def build(w):
             warnings = []
             config = w.stored_config()
-            config.update({"format": preset, "word_sep": PRESETS[preset][1], "openalex_key": key,
-                           "start_at_login": login})
+            config.update(
+                {
+                    "format": preset,
+                    "word_sep": PRESETS[preset][1],
+                    "openalex_key": key,
+                    "start_at_login": login,
+                }
+            )
             for folder in folders:
                 config = add_folder(config, folder, recursive=True, on_warning=warnings.append)
-            return config, warnings, w.preview_folders(config["folders"], config) if config["folders"] else []
+            return (
+                config,
+                warnings,
+                w.preview_folders(config["folders"], config) if config["folders"] else [],
+            )
 
         def built(result):
             config, warnings, items = result
@@ -576,6 +719,7 @@ class Controller(QObject):
 
 
 # Start-up -------------------------------------------------------------------------
+
 
 def sample_folder() -> Path | None:
     """sample_pdfs/ beside the source tree; for a built exe, PAPERNYM_SAMPLES or ./sample_pdfs."""
@@ -606,11 +750,18 @@ def _parent_pids() -> list[int]:
     from ctypes import wintypes
 
     class Entry(ctypes.Structure):
-        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
-                    ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_void_p),
-                    ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
-                    ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long),
-                    ("dwFlags", wintypes.DWORD), ("szExeFile", ctypes.c_char * 260)]
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.c_void_p),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", ctypes.c_char * 260),
+        ]
 
     kernel32 = ctypes.windll.kernel32
     kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
@@ -653,7 +804,9 @@ def _attach_console():
         pass
 
 
-SANDBOX_SERVER = "PaperNym-sandbox-" + hashlib.sha1(os.path.expanduser("~").encode("utf-8")).hexdigest()[:8]
+SANDBOX_SERVER = (
+    "PaperNym-sandbox-" + hashlib.sha1(os.path.expanduser("~").encode("utf-8")).hexdigest()[:8]
+)
 
 
 def server_name(home: Path) -> str:
@@ -676,12 +829,18 @@ def signal_existing(name: str) -> bool:
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(prog="papernym-gui", description="PaperNym tray application")
-    parser.add_argument("--sandbox", action="store_true",
-                        help="temporary settings and a temporary copy of sample_pdfs/; nothing real is touched")
+    parser.add_argument(
+        "--sandbox",
+        action="store_true",
+        help="temporary settings and a temporary copy of sample_pdfs/; nothing real is touched",
+    )
     parser.add_argument("--show", action="store_true", help="open the main window at start")
     parser.add_argument("--debug", action="store_true", help="log to the console at debug level")
-    parser.add_argument("--foreground", action="store_true",
-                        help="macOS: stay attached to the terminal instead of running in the background")
+    parser.add_argument(
+        "--foreground",
+        action="store_true",
+        help="macOS: stay attached to the terminal instead of running in the background",
+    )
     return parser.parse_args(argv)
 
 
@@ -696,10 +855,18 @@ def should_detach(args) -> bool:
 def detach(argv: list[str]) -> None:
     """Start PaperNym again in its own session, without the terminal (this process then exits)."""
     command = autostart.launch_argv() + list(argv)
-    subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True)
-    print("PaperNym is running in the background; find it in the menu bar or open it from "
-          "Spotlight. Use --foreground to keep it in this terminal.")
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+    )
+    print(
+        "PaperNym is running in the background; find it in the menu bar or open it from "
+        "Spotlight. Use --foreground to keep it in this terminal."
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -717,7 +884,9 @@ def main(argv: list[str] | None = None) -> int:
         log.setLevel(logging.DEBUG)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("PaperNym")
-    app.setDesktopFileName(autostart.DESKTOP_ID)  # Wayland/GNOME match the window to papernym.desktop
+    app.setDesktopFileName(
+        autostart.DESKTOP_ID
+    )  # Wayland/GNOME match the window to papernym.desktop
     app.setQuitOnLastWindowClosed(False)
     app.setWindowIcon(app_icon())
     welcome = []
@@ -725,8 +894,10 @@ def main(argv: list[str] | None = None) -> int:
     # fixed instance name instead of one derived from that folder (checked before creating it).
     name = SANDBOX_SERVER if args.sandbox else server_name(settings_dir())
     if signal_existing(name):
-        log.info("PaperNym%s is already running; asked it to show its window",
-                 " (sandbox)" if args.sandbox else "")
+        log.info(
+            "PaperNym%s is already running; asked it to show its window",
+            " (sandbox)" if args.sandbox else "",
+        )
         return 0
     if args.sandbox:
         os.environ["PAPERNYM_KEYRING"] = "off"  # sandbox keys stay in its temporary folder

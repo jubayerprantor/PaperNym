@@ -9,16 +9,21 @@ import os
 import re
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from . import __version__
 from .core import engine as engine_module
-from .core.config import (ConfigError, add_folder, load_config, save_config, settings_dir,
-                          _within)
+from .core.config import ConfigError, _within, add_folder, load_config, save_config, settings_dir
 from .core.db import Database, DatabaseError
-from .core.identify import (ARXIV_SOURCES, DOI_SOURCES, TITLE_SOURCES, Identifier,
-                            title_hit_ok, title_in_text)
+from .core.identify import (
+    ARXIV_SOURCES,
+    DOI_SOURCES,
+    TITLE_SOURCES,
+    Identifier,
+    title_hit_ok,
+    title_in_text,
+)
 from .core.keystore import SecretStore
 from .core.lock import LockBusyError, WriterLock
 from .core.logsetup import setup_file_log
@@ -26,16 +31,24 @@ from .core.naming import PRESETS, TemplateError, render_preset, validate_templat
 from .core.pdfread import ARXIV_FILE_RE, ARXIV_RE, PdfReadError, find_dois, read_pdf
 from .core.sources.http import HttpClient, NetError
 
-
-EXAMPLE = {"title": "Deep learning for crash severity prediction models", "year": 2025,
-           "year_online": 2024, "authors": ["Smith", "Jones", "Lee"],
-           "journal": "Accid Anal Prev", "source": "example"}
+EXAMPLE = {
+    "title": "Deep learning for crash severity prediction models",
+    "year": 2025,
+    "year_online": 2024,
+    "authors": ["Smith", "Jones", "Lee"],
+    "journal": "Accid Anal Prev",
+    "source": "example",
+}
 NO_TITLE_PRESETS = {"author_year", "author_year_journal"}
 WORD_SEPS = {"_": "_", " ": " ", "space": " ", "-": "-", "none": "", "": ""}
-KEY_NAMES = {"openalex": ("openalex_key", "OPENALEX_API_KEY"),
-             "semanticscholar": ("s2_key", "S2_API_KEY")}
-BUSY_MESSAGE = ("PaperNym is already running (tray app or 'papernym watch') and owns the "
-                "database. Stop it first, or use --dry-run.")
+KEY_NAMES = {
+    "openalex": ("openalex_key", "OPENALEX_API_KEY"),
+    "semanticscholar": ("s2_key", "S2_API_KEY"),
+}
+BUSY_MESSAGE = (
+    "PaperNym is already running (tray app or 'papernym watch') and owns the "
+    "database. Stop it first, or use --dry-run."
+)
 log = logging.getLogger("papernym")
 
 
@@ -43,8 +56,16 @@ class CliError(Exception):
     """A command failed; the message is printed and the exit code is 1."""
 
 
-COLORS = {"ok": "32", "check": "33", "?": "35", "busy": "34", "skip": "90",
-          "warn": "1;31", "preview": "36", "undo": "94"}
+COLORS = {
+    "ok": "32",
+    "check": "33",
+    "?": "35",
+    "busy": "34",
+    "skip": "90",
+    "warn": "1;31",
+    "preview": "36",
+    "undo": "94",
+}
 
 
 def _enable_windows_ansi(stream) -> bool:
@@ -103,7 +124,11 @@ class Output:
             log.info(message)
 
     def error(self, text: str):
-        print(f"{self._paint('[warn]', COLORS['warn'], self.err_color)} {text}", file=self.err, flush=True)
+        print(
+            f"{self._paint('[warn]', COLORS['warn'], self.err_color)} {text}",
+            file=self.err,
+            flush=True,
+        )
         log.warning(text)
 
     def event(self, event: dict):
@@ -141,9 +166,16 @@ class Output:
 
 def scan_summary(counts: dict) -> str:
     parts = [f"{counts.get('total', 0)} PDFs"]
-    for key, label in (("preview", "would be renamed"), ("ok", "named"), ("check", "to check"),
-                       ("unknown", "unidentified"), ("unreadable", "unreadable"),
-                       ("pending", "pending"), ("skipped", "unchanged"), ("pruned", "forgotten")):
+    for key, label in (
+        ("preview", "would be renamed"),
+        ("ok", "named"),
+        ("check", "to check"),
+        ("unknown", "unidentified"),
+        ("unreadable", "unreadable"),
+        ("pending", "pending"),
+        ("skipped", "unchanged"),
+        ("pruned", "forgotten"),
+    ):
         if counts.get(key):
             parts.append(f"{counts[key]} {label}")
     return "Summary: " + ", ".join(parts)
@@ -168,8 +200,9 @@ class Context:
     def engine(self, db: Database):
         config = load_config(self.home)
         identifier = Identifier(config, http_get=self.http_get, db=db, on_event=self.out.event)
-        return engine_module.Engine(config, db, identifier, on_event=self.out.event,
-                                    stable_fn=engine_module.stable_file)
+        return engine_module.Engine(
+            config, db, identifier, on_event=self.out.event, stable_fn=engine_module.stable_file
+        )
 
     def writer(self, dry_run: bool):
         """The writer lock for renaming commands; a no-op for dry runs."""
@@ -189,10 +222,15 @@ class _NoLock:
 
 # Settings commands ---------------------------------------------------------------
 
+
 def cmd_add_folder(ctx: Context) -> int:
     warnings = []
-    config = add_folder(ctx.settings(), ctx.args.path, recursive=not ctx.args.no_subfolders,
-                        on_warning=warnings.append)
+    config = add_folder(
+        ctx.settings(),
+        ctx.args.path,
+        recursive=not ctx.args.no_subfolders,
+        on_warning=warnings.append,
+    )
     ctx.save(config)
     for warning in warnings:
         ctx.out.line(warning, "warn")
@@ -205,8 +243,11 @@ def cmd_add_folder(ctx: Context) -> int:
 def cmd_remove_folder(ctx: Context) -> int:
     config = ctx.settings()
     target = os.path.abspath(os.path.expanduser(ctx.args.path))
-    keep = [folder for folder in config["folders"]
-            if not (_within(folder["path"], target) and _within(target, folder["path"]))]
+    keep = [
+        folder
+        for folder in config["folders"]
+        if not (_within(folder["path"], target) and _within(target, folder["path"]))
+    ]
     if len(keep) == len(config["folders"]):
         raise CliError(f"not a watched folder: {target}")
     config["folders"] = keep
@@ -247,9 +288,12 @@ def cmd_set_key(ctx: Context) -> int:
         ctx.out.line(f"{ctx.args.service} key saved in {store.describe()}", "ok")
     elif config[key_name]:
         ctx.out.line(f"{ctx.args.service} key saved", "ok")
-        ctx.out.line("no system credential store found, so the key is in config.json "
-                     "(readable only by you). Install and unlock a keyring such as GNOME Keyring "
-                     f"or KWallet, or set {variable} in the environment instead.", "warn")
+        ctx.out.line(
+            "no system credential store found, so the key is in config.json "
+            "(readable only by you). Install and unlock a keyring such as GNOME Keyring "
+            f"or KWallet, or set {variable} in the environment instead.",
+            "warn",
+        )
     else:
         ctx.out.line(f"{ctx.args.service} key removed", "ok")
     if variable in os.environ:
@@ -322,9 +366,13 @@ def cmd_set_format(ctx: Context) -> int:
         config["word_sep"] = PRESETS[args.preset][1]
         ctx.save(config)
         if args.preset in NO_TITLE_PRESETS:
-            ctx.out.line("this preset has no title; names may collide and get _b, _c endings", "warn")
+            ctx.out.line(
+                "this preset has no title; names may collide and get _b, _c endings", "warn"
+            )
         ctx.out.line(f"format set: {args.preset}  e.g. {render_preset(args.preset, EXAMPLE)}", "ok")
-    ctx.out.line("existing files keep their names; run 'papernym reformat --dry-run' to preview", "ok")
+    ctx.out.line(
+        "existing files keep their names; run 'papernym reformat --dry-run' to preview", "ok"
+    )
     return 0
 
 
@@ -341,7 +389,9 @@ def cmd_set_title_search(ctx: Context) -> int:
     config["title_search"] = ctx.args.state == "on"
     ctx.save(config)
     if config["title_search"]:
-        ctx.out.line("title search on: titles may be sent to Crossref, OpenAlex, Semantic Scholar", "ok")
+        ctx.out.line(
+            "title search on: titles may be sent to Crossref, OpenAlex, Semantic Scholar", "ok"
+        )
     else:
         ctx.out.line("title search off: only DOI and arXiv lookups run", "ok")
     return 0
@@ -357,17 +407,25 @@ def cmd_menu_entry(ctx: Context) -> int:
     from .core import autostart
 
     if not autostart.needs_menu_entry():
-        raise CliError("menu-entry is for pip installs on Linux and macOS; "
-                       "the Windows installer and the .deb add their own entry")
+        raise CliError(
+            "menu-entry is for pip installs on Linux and macOS; "
+            "the Windows installer and the .deb add their own entry"
+        )
     where = autostart.launcher_path()
     if ctx.args.remove:
         removed = autostart.remove_menu_entry()
         ctx.out.line(f"Removed {where}" if removed else "No launcher to remove")
         return 0
     if importlib.util.find_spec("PySide6") is None:
-        raise CliError('the tray app is not installed; install it with: pip install "papernym[gui]"')
+        raise CliError(
+            'the tray app is not installed; install it with: pip install "papernym[gui]"'
+        )
     autostart.install_menu_entry()
-    place = "Applications (open it from Spotlight or Launchpad)" if autostart.is_macos() else "your app menu"
+    place = (
+        "Applications (open it from Spotlight or Launchpad)"
+        if autostart.is_macos()
+        else "your app menu"
+    )
     ctx.out.line(f"PaperNym is in {place}: {where}")
     return 0
 
@@ -390,7 +448,9 @@ def cmd_show(ctx: Context) -> int:
     if name:
         out.line(f"Format:       {name}  e.g. {render_preset(name, EXAMPLE)}")
     else:
-        out.line(f"Format:       custom {config['format']}  (word separator {config['word_sep']!r})")
+        out.line(
+            f"Format:       custom {config['format']}  (word separator {config['word_sep']!r})"
+        )
     out.line(f"Year:         {config['year']}")
     out.line(f"Title search: {'on' if config['title_search'] else 'off'}")
     out.line(f"Email:        {config['email'] or 'not set'}")
@@ -405,6 +465,7 @@ def cmd_show(ctx: Context) -> int:
 
 # Renaming commands ---------------------------------------------------------------
 
+
 def cmd_scan(ctx: Context) -> int:
     dry_run = ctx.args.dry_run
     lock = ctx.writer(dry_run)
@@ -418,10 +479,15 @@ def cmd_scan(ctx: Context) -> int:
                     raise CliError(f"not a folder: {root}")
                 folders = [{"path": str(root), "recursive": not ctx.args.no_subfolders}]
                 scope = "with subfolders" if folders[0]["recursive"] else "without subfolders"
-                ctx.out.line(f"scanning {root} ({scope}) once; it is not added to the watched folders")
+                ctx.out.line(
+                    f"scanning {root} ({scope}) once; it is not added to the watched folders"
+                )
             elif not worker.config["folders"]:
-                ctx.out.line("no folders configured; add one with: papernym add-folder PATH, "
-                             "or scan the current folder once with: papernym scan .", "warn")
+                ctx.out.line(
+                    "no folders configured; add one with: papernym add-folder PATH, "
+                    "or scan the current folder once with: papernym scan .",
+                    "warn",
+                )
                 ctx.out.line(scan_summary({"total": 0}))
                 return 0
             if dry_run:
@@ -438,7 +504,9 @@ def cmd_watch(ctx: Context) -> int:
     with Database(ctx.home) as db:
         worker = ctx.engine(db)
         if not worker.config["folders"]:
-            ctx.out.line("no folders configured yet; add one with: papernym add-folder PATH", "warn")
+            ctx.out.line(
+                "no folders configured yet; add one with: papernym add-folder PATH", "warn"
+            )
         watcher = Watcher(worker, poll=ctx.args.poll)
         try:
             watcher.start()
@@ -463,7 +531,9 @@ def cmd_reformat(ctx: Context) -> int:
         with Database(ctx.home) as db:
             if dry_run:
                 ctx.out.line("dry run: nothing will be renamed", "preview")
-            counts = ctx.engine(db).reformat(dry_run=dry_run, include_manual=ctx.args.include_manual)
+            counts = ctx.engine(db).reformat(
+                dry_run=dry_run, include_manual=ctx.args.include_manual
+            )
     finally:
         lock.release()
     tally = ctx.out.tally
@@ -472,9 +542,13 @@ def cmd_reformat(ctx: Context) -> int:
     else:
         changed = f"{tally.get('renamed', 0) + tally.get('needs_check', 0)} renamed"
     handled = sum(counts.get(key, 0) for key in ("preview", "ok", "check"))
-    unchanged = handled - tally.get("preview", 0) - tally.get("renamed", 0) - tally.get("needs_check", 0)
-    ctx.out.line(f"Summary: {changed}, {unchanged} already match, {counts.get('skipped', 0)} skipped"
-                 + ("" if ctx.args.include_manual else " (hand-renamed files are left alone)"))
+    unchanged = (
+        handled - tally.get("preview", 0) - tally.get("renamed", 0) - tally.get("needs_check", 0)
+    )
+    ctx.out.line(
+        f"Summary: {changed}, {unchanged} already match, {counts.get('skipped', 0)} skipped"
+        + ("" if ctx.args.include_manual else " (hand-renamed files are left alone)")
+    )
     return 0
 
 
@@ -538,28 +612,39 @@ def cmd_status(ctx: Context) -> int:
         running = True
     finally:
         lock.release()
-    labels = (("ok", "named"), ("check", "to check"), ("unknown", "unidentified"),
-              ("unreadable", "unreadable"), ("pending", "pending"))
+    labels = (
+        ("ok", "named"),
+        ("check", "to check"),
+        ("unknown", "unidentified"),
+        ("unreadable", "unreadable"),
+        ("pending", "pending"),
+    )
     ctx.out.line("Files: " + ", ".join(f"{counts.get(key, 0)} {label}" for key, label in labels))
     ctx.out.line(f"Renames in history: {renames}")
-    ctx.out.line("Watcher: " + ("running (tray app or 'papernym watch')" if running else "not running"))
+    ctx.out.line(
+        "Watcher: " + ("running (tray app or 'papernym watch')" if running else "not running")
+    )
     if not attention:
         ctx.out.line("Nothing needs attention.")
         return 0
     ctx.out.line("Needs attention:")
     prefix = {"check": "check", "unknown": "?", "unreadable": "?", "pending": "busy"}
-    hints = {"check": "offline guess; verify, or: papernym fix PATH --doi DOI",
-             "unknown": "not identified; papernym fix PATH --doi DOI",
-             "unreadable": "PDF could not be read",
-             "pending": "rename waiting for retry"}
+    hints = {
+        "check": "offline guess; verify, or: papernym fix PATH --doi DOI",
+        "unknown": "not identified; papernym fix PATH --doi DOI",
+        "unreadable": "PDF could not be read",
+        "pending": "rename waiting for retry",
+    }
     for row in attention:
         missing = "" if Path(row["display_path"]).exists() else " (missing)"
-        ctx.out.line(f"{row['display_path']}{missing}  -- {hints[row['status']]}",
-                     prefix[row["status"]])
+        ctx.out.line(
+            f"{row['display_path']}{missing}  -- {hints[row['status']]}", prefix[row["status"]]
+        )
     return 0
 
 
 # Diagnostics ---------------------------------------------------------------------
+
 
 def cmd_test_apis(ctx: Context) -> int:
     from .core.apitest import run_checks
@@ -567,9 +652,11 @@ def cmd_test_apis(ctx: Context) -> int:
     config = load_config(ctx.home)
     http_get = ctx.http_get or HttpClient(config).get
     ctx.out.line(f"Settings folder: {ctx.home}")
-    ctx.out.line(f"OpenAlex key: {'set' if config['openalex_key'] else 'not set'}   "
-                 f"Semantic Scholar key: {'set' if config['s2_key'] else 'not set'}   "
-                 f"Email: {config['email'] or 'not set'}")
+    ctx.out.line(
+        f"OpenAlex key: {'set' if config['openalex_key'] else 'not set'}   "
+        f"Semantic Scholar key: {'set' if config['s2_key'] else 'not set'}   "
+        f"Email: {config['email'] or 'not set'}"
+    )
 
     def show(result):
         detail = result.detail
@@ -580,9 +667,13 @@ def cmd_test_apis(ctx: Context) -> int:
 
     results = run_checks(config, http_get, on_result=show)
     tally = {key: sum(r.status == key for r in results) for key in ("PASS", "FAIL", "SKIP")}
-    ctx.out.line(f"Summary: {tally['PASS']} passed, {tally['FAIL']} failed, {tally['SKIP']} skipped")
+    ctx.out.line(
+        f"Summary: {tally['PASS']} passed, {tally['FAIL']} failed, {tally['SKIP']} skipped"
+    )
     if tally["FAIL"] and tally["FAIL"] == len(results) - tally["SKIP"]:
-        ctx.out.line("everything failed: check your internet connection, VPN, firewall or proxy", "warn")
+        ctx.out.line(
+            "everything failed: check your internet connection, VPN, firewall or proxy", "warn"
+        )
     elif tally["FAIL"]:
         ctx.out.line("PaperNym still works: it falls back to the sources that passed", "warn")
     return 1 if tally["FAIL"] else 0
@@ -613,8 +704,13 @@ def cmd_compare(ctx: Context, sleep: Callable = time.sleep) -> int:
     files = []
     for root, recursive in roots:
         if root.is_dir():
-            files.extend(sorted(path for path in (root.rglob("*") if recursive else root.iterdir())
-                                if path.suffix.lower() == ".pdf" and path.is_file()))
+            files.extend(
+                sorted(
+                    path
+                    for path in (root.rglob("*") if recursive else root.iterdir())
+                    if path.suffix.lower() == ".pdf" and path.is_file()
+                )
+            )
         else:
             ctx.out.line(f"{root}: folder is unavailable", "warn")
     ctx.out.line(f"Comparing sources for {len(files)} PDFs (nothing is renamed)")
@@ -637,7 +733,9 @@ def cmd_compare(ctx: Context, sleep: Callable = time.sleep) -> int:
         except PdfReadError as exc:
             ctx.out.line(f"unreadable PDF: {exc}", "?")
             continue
-        dois = list(dict.fromkeys([doi.lower() for doi in info["md_dois"]] + find_dois(info["text"])))[:6]
+        dois = list(
+            dict.fromkeys([doi.lower() for doi in info["md_dois"]] + find_dois(info["text"]))
+        )[:6]
         arxiv_match = ARXIV_RE.search(info["text"]) or ARXIV_FILE_RE.match(path.stem)
         ctx.out.line(f"   DOIs found:   {', '.join(dois) or 'none'}")
         ctx.out.line(f"   arXiv id:     {arxiv_match.group(1) if arxiv_match else 'none'}")
@@ -657,7 +755,7 @@ def cmd_compare(ctx: Context, sleep: Callable = time.sleep) -> int:
                 ctx.out.line(f"     {source:16} {note or _describe(meta)}")
         query = info["big_title"] or info["md_title"]
         if query and config["title_search"]:
-            ctx.out.line(f"   Title search")
+            ctx.out.line("   Title search")
             for source, function in TITLE_SOURCES:
                 hits, note = ask(source, function, query)
                 accepted = next((hit for hit in hits or [] if title_hit_ok(hit, query, info)), None)
@@ -675,18 +773,25 @@ def cmd_compare(ctx: Context, sleep: Callable = time.sleep) -> int:
 
 # Parser --------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="papernym", description="Rename academic paper PDFs using scholarly metadata.",
+        prog="papernym",
+        description="Rename academic paper PDFs using scholarly metadata.",
         epilog="Settings live in %APPDATA%\\PaperNym on Windows, ~/.config/PaperNym elsewhere "
-               "(or $PAPERNYM_HOME). "
-               "Typical start: papernym add-folder PATH, then papernym scan --dry-run. "
-               "To rename the PDFs in the current folder once: papernym scan .")
+        "(or $PAPERNYM_HOME). "
+        "Typical start: papernym add-folder PATH, then papernym scan --dry-run. "
+        "To rename the PDFs in the current folder once: papernym scan .",
+    )
     parser.add_argument("--version", action="version", version=f"papernym {__version__}")
     parser.add_argument("--no-color", action="store_true", help="plain output without colours")
     shared = argparse.ArgumentParser(add_help=False)
-    shared.add_argument("--no-color", action="store_true", default=argparse.SUPPRESS,
-                        help="plain output without colours")
+    shared.add_argument(
+        "--no-color",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="plain output without colours",
+    )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     def command(name, func, help_text):
@@ -699,7 +804,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-subfolders", action="store_true", help="do not include subfolders")
     p = command("remove-folder", cmd_remove_folder, "Stop watching a folder")
     p.add_argument("path")
-    p = command("exclude", cmd_exclude, "Add or remove an exclude pattern (folder names end with /)")
+    p = command(
+        "exclude", cmd_exclude, "Add or remove an exclude pattern (folder names end with /)"
+    )
     p.add_argument("pattern")
     p.add_argument("--remove", action="store_true", help="remove the pattern instead")
     p = command("set-key", cmd_set_key, "Store an API key")
@@ -710,21 +817,35 @@ def build_parser() -> argparse.ArgumentParser:
     command("formats", cmd_formats, "List the fixed presets with an example each")
     p = command("set-format", cmd_set_format, "Choose a preset or a custom template")
     p.add_argument("preset", nargs="?")
-    p.add_argument("--custom", metavar="TEMPLATE", help="custom template, e.g. \"{year}_{author}_{title}\"")
-    p.add_argument("--word-sep", choices=["_", " ", "space", "-", "none"],
-                   help="separator between words of a field (custom only)")
+    p.add_argument(
+        "--custom", metavar="TEMPLATE", help='custom template, e.g. "{year}_{author}_{title}"'
+    )
+    p.add_argument(
+        "--word-sep",
+        choices=["_", " ", "space", "-", "none"],
+        help="separator between words of a field (custom only)",
+    )
     p = command("set-year", cmd_set_year, "Year mode")
     p.add_argument("mode", choices=["citation", "online"])
     p = command("set-title-search", cmd_set_title_search, "Allow sending titles to search services")
     p.add_argument("state", choices=["on", "off"])
     command("show", cmd_show, "Print settings, folders and the settings-folder path")
-    p = command("menu-entry", cmd_menu_entry, "pip installs: add PaperNym to the Linux app menu, or to ~/Applications on macOS")
+    p = command(
+        "menu-entry",
+        cmd_menu_entry,
+        "pip installs: add PaperNym to the Linux app menu, or to ~/Applications on macOS",
+    )
     p.add_argument("--remove", action="store_true", help="remove the launcher instead")
     p = command("scan", cmd_scan, "Process every PDF in the watched folders, or in FOLDER, once")
-    p.add_argument("folder", nargs="?",
-                   help="scan only this folder (e.g. . for the current one); it is not added to the watch list")
+    p.add_argument(
+        "folder",
+        nargs="?",
+        help="scan only this folder (e.g. . for the current one); it is not added to the watch list",
+    )
     p.add_argument("--dry-run", action="store_true", help="show old -> new without renaming")
-    p.add_argument("--no-subfolders", action="store_true", help="with FOLDER: do not include subfolders")
+    p.add_argument(
+        "--no-subfolders", action="store_true", help="with FOLDER: do not include subfolders"
+    )
     p = command("watch", cmd_watch, "Scan, then keep watching until Ctrl+C")
     p.add_argument("--poll", action="store_true", help="polling observer (network drives)")
     p = command("reformat", cmd_reformat, "Apply the current naming to earlier renames")
@@ -737,13 +858,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--doi", required=True)
     command("status", cmd_status, "Counts by status; list files needing attention")
     command("test-apis", cmd_test_apis, "Check each metadata service with a known paper")
-    p = command("compare", cmd_compare, "Show what every source returns for each PDF; renames nothing")
+    p = command(
+        "compare", cmd_compare, "Show what every source returns for each PDF; renames nothing"
+    )
     p.add_argument("folder", nargs="?")
     return parser
 
 
-def main(argv: list[str] | None = None, *, stdout=None, stderr=None,
-         http_get: Callable | None = None) -> int:
+def main(
+    argv: list[str] | None = None, *, stdout=None, stderr=None, http_get: Callable | None = None
+) -> int:
     for stream in (stdout or sys.stdout, stderr or sys.stderr):
         if hasattr(stream, "reconfigure"):
             try:

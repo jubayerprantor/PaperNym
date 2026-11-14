@@ -11,25 +11,53 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
 
-TEAL = "#0B5563"     # icon background
-AMBER = "#FFB020"    # icon label
+TEAL = "#0B5563"  # icon background
+AMBER = "#FFB020"  # icon label
 MODES = ("system", "light", "dark")
 ICONS = (Path(__file__).resolve().parent / "icons").as_posix()
 
 LIGHT = {
-    "window": "#F3F7F8", "base": "#FFFFFF", "alt": "#EAF2F4", "text": "#10262C",
-    "muted": "#4B6369", "button": "#E3ECEE", "border": "#C3D3D7", "highlight": TEAL,
-    "on_highlight": "#FFFFFF", "accent": AMBER, "on_accent": "#1F1600", "link": TEAL,
-    "tab": "#E3ECEE", "banner": "#FFF2D1", "on_banner": "#3A2C00", "banner_border": "#E0A41C",
-    "disabled": "#8A9A9E", "progress": "#A8D8DF", "on_progress": "#10262C",
+    "window": "#F3F7F8",
+    "base": "#FFFFFF",
+    "alt": "#EAF2F4",
+    "text": "#10262C",
+    "muted": "#4B6369",
+    "button": "#E3ECEE",
+    "border": "#C3D3D7",
+    "highlight": TEAL,
+    "on_highlight": "#FFFFFF",
+    "accent": AMBER,
+    "on_accent": "#1F1600",
+    "link": TEAL,
+    "tab": "#E3ECEE",
+    "banner": "#FFF2D1",
+    "on_banner": "#3A2C00",
+    "banner_border": "#E0A41C",
+    "disabled": "#8A9A9E",
+    "progress": "#A8D8DF",
+    "on_progress": "#10262C",
     "arrow": "arrow-light.svg",
 }
 DARK = {
-    "window": "#0D1D22", "base": "#11272D", "alt": "#163039", "text": "#E4EEF0",
-    "muted": "#9DB3B8", "button": "#1A3740", "border": "#2B4E58", "highlight": "#1C7A89",
-    "on_highlight": "#FFFFFF", "accent": AMBER, "on_accent": "#1F1600", "link": "#FFC24D",
-    "tab": "#14303A", "banner": "#3A2C00", "on_banner": "#FFE7A8", "banner_border": "#A87410",
-    "disabled": "#5F767C", "progress": "#1C7A89", "on_progress": "#FFFFFF",
+    "window": "#0D1D22",
+    "base": "#11272D",
+    "alt": "#163039",
+    "text": "#E4EEF0",
+    "muted": "#9DB3B8",
+    "button": "#1A3740",
+    "border": "#2B4E58",
+    "highlight": "#1C7A89",
+    "on_highlight": "#FFFFFF",
+    "accent": AMBER,
+    "on_accent": "#1F1600",
+    "link": "#FFC24D",
+    "tab": "#14303A",
+    "banner": "#3A2C00",
+    "on_banner": "#FFE7A8",
+    "banner_border": "#A87410",
+    "disabled": "#5F767C",
+    "progress": "#1C7A89",
+    "on_progress": "#FFFFFF",
     "arrow": "arrow-dark.svg",
 }
 
@@ -51,13 +79,24 @@ def colours(mode: str) -> dict:
 def palette(c: dict) -> QPalette:
     p = QPalette()
     roles = {
-        QPalette.Window: c["window"], QPalette.WindowText: c["text"], QPalette.Base: c["base"],
-        QPalette.AlternateBase: c["alt"], QPalette.Text: c["text"], QPalette.Button: c["button"],
-        QPalette.ButtonText: c["text"], QPalette.Highlight: c["highlight"],
-        QPalette.HighlightedText: c["on_highlight"], QPalette.Link: c["link"],
-        QPalette.LinkVisited: c["link"], QPalette.ToolTipBase: c["base"], QPalette.ToolTipText: c["text"],
-        QPalette.PlaceholderText: c["muted"], QPalette.BrightText: c["accent"],
-        QPalette.Mid: c["border"], QPalette.Dark: c["border"], QPalette.Light: c["base"],
+        QPalette.Window: c["window"],
+        QPalette.WindowText: c["text"],
+        QPalette.Base: c["base"],
+        QPalette.AlternateBase: c["alt"],
+        QPalette.Text: c["text"],
+        QPalette.Button: c["button"],
+        QPalette.ButtonText: c["text"],
+        QPalette.Highlight: c["highlight"],
+        QPalette.HighlightedText: c["on_highlight"],
+        QPalette.Link: c["link"],
+        QPalette.LinkVisited: c["link"],
+        QPalette.ToolTipBase: c["base"],
+        QPalette.ToolTipText: c["text"],
+        QPalette.PlaceholderText: c["muted"],
+        QPalette.BrightText: c["accent"],
+        QPalette.Mid: c["border"],
+        QPalette.Dark: c["border"],
+        QPalette.Light: c["base"],
     }
     for role, value in roles.items():
         p.setColor(role, QColor(value))
@@ -68,45 +107,45 @@ def palette(c: dict) -> QPalette:
 
 def stylesheet(c: dict) -> str:
     return f"""
-QTabWidget::pane {{ border: 1px solid {c['border']}; border-radius: 4px; top: -1px; }}
-QTabBar::tab {{ background: {c['tab']}; color: {c['muted']}; padding: 7px 14px;
-    border: 1px solid {c['border']}; border-bottom: none; margin-right: 2px;
+QTabWidget::pane {{ border: 1px solid {c["border"]}; border-radius: 4px; top: -1px; }}
+QTabBar::tab {{ background: {c["tab"]}; color: {c["muted"]}; padding: 7px 14px;
+    border: 1px solid {c["border"]}; border-bottom: none; margin-right: 2px;
     border-top-left-radius: 4px; border-top-right-radius: 4px; }}
-QTabBar::tab:selected {{ background: {c['highlight']}; color: {c['on_highlight']};
-    border-color: {c['highlight']}; border-top: 3px solid {c['accent']}; }}
-QTabBar::tab:hover:!selected {{ color: {c['text']}; }}
-QPushButton {{ background: {c['button']}; color: {c['text']}; border: 1px solid {c['border']};
+QTabBar::tab:selected {{ background: {c["highlight"]}; color: {c["on_highlight"]};
+    border-color: {c["highlight"]}; border-top: 3px solid {c["accent"]}; }}
+QTabBar::tab:hover:!selected {{ color: {c["text"]}; }}
+QPushButton {{ background: {c["button"]}; color: {c["text"]}; border: 1px solid {c["border"]};
     border-radius: 4px; padding: 5px 12px; }}
-QPushButton:hover {{ border-color: {c['highlight']}; }}
-QPushButton:focus {{ border: 2px solid {c['accent']}; }}
-QPushButton:default {{ background: {c['accent']}; color: {c['on_accent']}; border-color: {c['accent']}; }}
-QPushButton:disabled {{ color: {c['disabled']}; background: {c['window']}; }}
-QLineEdit, QComboBox, QPlainTextEdit, QTextEdit {{ background: {c['base']};
-    color: {c['text']}; border: 1px solid {c['border']}; border-radius: 4px; padding: 4px; }}
-QLineEdit:focus, QComboBox:focus {{ border: 2px solid {c['highlight']}; }}
-QTableView, QTreeView, QTreeWidget, QListWidget {{ background: {c['base']};
-    alternate-background-color: {c['alt']}; gridline-color: {c['border']};
-    border: 1px solid {c['border']}; border-radius: 4px; }}
-QHeaderView::section {{ background: {c['tab']}; color: {c['text']}; padding: 5px;
-    border: none; border-right: 1px solid {c['border']}; border-bottom: 2px solid {c['highlight']}; }}
-QProgressBar {{ border: 1px solid {c['border']}; border-radius: 4px; text-align: center;
-    background: {c['base']}; color: {c['on_progress']}; }}
-QProgressBar::chunk {{ background: {c['progress']}; border-radius: 3px; }}
+QPushButton:hover {{ border-color: {c["highlight"]}; }}
+QPushButton:focus {{ border: 2px solid {c["accent"]}; }}
+QPushButton:default {{ background: {c["accent"]}; color: {c["on_accent"]}; border-color: {c["accent"]}; }}
+QPushButton:disabled {{ color: {c["disabled"]}; background: {c["window"]}; }}
+QLineEdit, QComboBox, QPlainTextEdit, QTextEdit {{ background: {c["base"]};
+    color: {c["text"]}; border: 1px solid {c["border"]}; border-radius: 4px; padding: 4px; }}
+QLineEdit:focus, QComboBox:focus {{ border: 2px solid {c["highlight"]}; }}
+QTableView, QTreeView, QTreeWidget, QListWidget {{ background: {c["base"]};
+    alternate-background-color: {c["alt"]}; gridline-color: {c["border"]};
+    border: 1px solid {c["border"]}; border-radius: 4px; }}
+QHeaderView::section {{ background: {c["tab"]}; color: {c["text"]}; padding: 5px;
+    border: none; border-right: 1px solid {c["border"]}; border-bottom: 2px solid {c["highlight"]}; }}
+QProgressBar {{ border: 1px solid {c["border"]}; border-radius: 4px; text-align: center;
+    background: {c["base"]}; color: {c["on_progress"]}; }}
+QProgressBar::chunk {{ background: {c["progress"]}; border-radius: 3px; }}
 QComboBox {{ padding-right: 24px; }}
 QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 22px;
-    border: none; border-left: 1px solid {c['border']}; }}
-QComboBox::down-arrow {{ image: url({ICONS}/{c['arrow']}); width: 12px; height: 12px; }}
-QComboBox QAbstractItemView {{ background: {c['base']}; color: {c['text']}; border: 1px solid {c['border']};
-    selection-background-color: {c['highlight']}; selection-color: {c['on_highlight']}; outline: none; }}
-QLabel#banner {{ background: {c['banner']}; color: {c['on_banner']};
-    border: 1px solid {c['banner_border']}; border-radius: 4px; padding: 6px; }}
-QStatusBar {{ color: {c['muted']}; }}
-QCheckBox::indicator, QTreeView::indicator, QTableView::indicator {{ width: 14px; height: 14px; border: 1px solid {c['muted']}; border-radius: 3px;
-    background: {c['base']}; }}
-QCheckBox::indicator:checked, QTreeView::indicator:checked, QTableView::indicator:checked {{ background: {c['highlight']}; border-color: {c['highlight']};
+    border: none; border-left: 1px solid {c["border"]}; }}
+QComboBox::down-arrow {{ image: url({ICONS}/{c["arrow"]}); width: 12px; height: 12px; }}
+QComboBox QAbstractItemView {{ background: {c["base"]}; color: {c["text"]}; border: 1px solid {c["border"]};
+    selection-background-color: {c["highlight"]}; selection-color: {c["on_highlight"]}; outline: none; }}
+QLabel#banner {{ background: {c["banner"]}; color: {c["on_banner"]};
+    border: 1px solid {c["banner_border"]}; border-radius: 4px; padding: 6px; }}
+QStatusBar {{ color: {c["muted"]}; }}
+QCheckBox::indicator, QTreeView::indicator, QTableView::indicator {{ width: 14px; height: 14px; border: 1px solid {c["muted"]}; border-radius: 3px;
+    background: {c["base"]}; }}
+QCheckBox::indicator:checked, QTreeView::indicator:checked, QTableView::indicator:checked {{ background: {c["highlight"]}; border-color: {c["highlight"]};
     image: url({ICONS}/check-white.svg); }}
-QTreeView::indicator:checked:selected, QTableView::indicator:checked:selected {{ border: 1px solid {c['accent']}; }}
-QCheckBox::indicator:disabled, QTreeView::indicator:disabled {{ border-color: {c['disabled']}; }}
+QTreeView::indicator:checked:selected, QTableView::indicator:checked:selected {{ border: 1px solid {c["accent"]}; }}
+QCheckBox::indicator:disabled, QTreeView::indicator:disabled {{ border-color: {c["disabled"]}; }}
 """
 
 

@@ -8,30 +8,62 @@ import os
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                               QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QInputDialog,
-                               QLabel, QLineEdit, QListWidget, QMessageBox, QProgressBar,
-                               QPushButton, QTableWidget, QTableWidgetItem, QTreeWidget,
-                               QTreeWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMenu,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .. import __version__
+from ..core import updates
 from ..core.apitest import run_checks
 from ..core.config import ConfigError, validate_config
-from ..core.logsetup import log_path
-from ..core.naming import PRESETS, TOKENS, TemplateError, build_name, validate_template
-from ..core import updates
 from ..core.keystore import SecretStore
+from ..core.logsetup import log_path
+from ..core.naming import PRESETS, TemplateError, build_name, validate_template
 from ..core.sources.http import HttpClient, mask_secrets
-from .common import (EVENT_STATUS, FILE_STATUS, REASONS, SAMPLE_PAPERS, LinkLabel, app_icon, open_path,
-                     short,
-                     show_in_folder)
-from .dialogs import DetailsDialog, PreviewDialog
+from .common import (
+    EVENT_STATUS,
+    FILE_STATUS,
+    REASONS,
+    SAMPLE_PAPERS,
+    LinkLabel,
+    app_icon,
+    open_path,
+    short,
+    show_in_folder,
+)
+from .dialogs import DetailsDialog
 from .table import PagedTable
 
 NO_TITLE = {"author_year", "author_year_journal"}
-SEPARATORS = (("Underscore  _", "_"), ("Space", " "), ("Hyphen  -", "-"), ("None (words run together)", ""))
+SEPARATORS = (
+    ("Underscore  _", "_"),
+    ("Space", " "),
+    ("Hyphen  -", "-"),
+    ("None (words run together)", ""),
+)
 
 
 def _table(headers: list[str], name: str) -> QTableWidget:
@@ -111,20 +143,39 @@ class ActivityTab(QWidget):
         top.addWidget(self.progress, 1)
         layout.addLayout(top)
         self.table = PagedTable(
-            [("Time", lambda r: r["time"]), ("Status", lambda r: r["status"]),
-             ("Source", lambda r: r["source"]), ("Old name", lambda r: r["old"]),
-             ("New name / details", lambda r: r["new"])],
-            name="Activity", search_text=lambda r: f"{r['old']} {r['new']} {r['path']}",
-            statuses=[EVENT_STATUS[key] for key in self.SHOWN], status_of=lambda r: r["status"])
+            [
+                ("Time", lambda r: r["time"]),
+                ("Status", lambda r: r["status"]),
+                ("Source", lambda r: r["source"]),
+                ("Old name", lambda r: r["old"]),
+                ("New name / details", lambda r: r["new"]),
+            ],
+            name="Activity",
+            search_text=lambda r: f"{r['old']} {r['new']} {r['path']}",
+            statuses=[EVENT_STATUS[key] for key in self.SHOWN],
+            status_of=lambda r: r["status"],
+        )
         for column, width in enumerate((125, 105, 100, 330)):
             self.table.view.setColumnWidth(column, width)
-        self.table.set_actions([("Open file", self._open), ("Show in folder", self._reveal),
-                                ("Undo this rename", self._undo), ("Refresh metadata", self._refresh)])
+        self.table.set_actions(
+            [
+                ("Open file", self._open),
+                ("Show in folder", self._reveal),
+                ("Undo this rename", self._undo),
+                ("Refresh metadata", self._refresh),
+                ("Copy BibTeX citation", self._copy_bibtex),
+            ]
+        )
         layout.addWidget(self.table)
         actions = QHBoxLayout()
         self.buttons = []
-        for text, slot in (("&Open file", self._open), ("Show in &folder", self._reveal),
-                           ("&Undo", self._undo), ("Refresh &metadata", self._refresh)):
+        for text, slot in (
+            ("&Open file", self._open),
+            ("Show in &folder", self._reveal),
+            ("&Undo", self._undo),
+            ("Refresh &metadata", self._refresh),
+            ("Copy &BibTeX", self._copy_bibtex),
+        ):
             button = QPushButton(text)
             button.clicked.connect(slot)
             actions.addWidget(button)
@@ -141,12 +192,19 @@ class ActivityTab(QWidget):
         entries = []
         for row in rows:  # newest first
             undone = bool(row["undone"])
-            entries.append({"time": _time(row["time"]),
-                            "status": "Undone" if undone else ("Check" if row["status"] == "check" else "Renamed"),
-                            "source": row["source"], "old": short(row["old_path"]),
-                            "new": short(row["new_path"]),
-                            "path": row["old_path"] if undone else row["new_path"],
-                            "undoable": not undone})
+            entries.append(
+                {
+                    "time": _time(row["time"]),
+                    "status": "Undone"
+                    if undone
+                    else ("Check" if row["status"] == "check" else "Renamed"),
+                    "source": row["source"],
+                    "old": short(row["old_path"]),
+                    "new": short(row["new_path"]),
+                    "path": row["old_path"] if undone else row["new_path"],
+                    "undoable": not undone,
+                }
+            )
         self.table.set_rows(self.table.all_rows + entries)
 
     def on_event(self, event: dict):
@@ -163,18 +221,27 @@ class ActivityTab(QWidget):
         elif kind == "scan_finished":
             counts = event.get("counts", {})
             self.progress.setValue(self.progress.maximum())
-            self.progress.setFormat(f"Last scan: {counts.get('total', 0)} PDFs, {counts.get('ok', 0)} named, "
-                                    f"{counts.get('check', 0)} to check, {counts.get('unknown', 0)} not identified")
+            self.progress.setFormat(
+                f"Last scan: {counts.get('total', 0)} PDFs, {counts.get('ok', 0)} named, "
+                f"{counts.get('check', 0)} to check, {counts.get('unknown', 0)} not identified"
+            )
             self.scan_button.setEnabled(True)
         elif kind in self.SHOWN:
             renamed = kind in ("renamed", "needs_check", "undo")
             if kind == "undo":
                 self._mark_undone(event.get("old_path", ""))
-            self.table.prepend({"time": _time(), "status": EVENT_STATUS[kind], "source": event.get("source", ""),
-                                "old": short(event.get("old_path") or event["path"]),
-                                "new": short(event.get("new_path", "")) if renamed else event["message"],
-                                "path": event.get("new_path") or event["path"],
-                                "undoable": kind in ("renamed", "needs_check")}, ACTIVITY_LIMIT)
+            self.table.prepend(
+                {
+                    "time": _time(),
+                    "status": EVENT_STATUS[kind],
+                    "source": event.get("source", ""),
+                    "old": short(event.get("old_path") or event["path"]),
+                    "new": short(event.get("new_path", "")) if renamed else event["message"],
+                    "path": event.get("new_path") or event["path"],
+                    "undoable": kind in ("renamed", "needs_check"),
+                },
+                ACTIVITY_LIMIT,
+            )
 
     def _mark_undone(self, renamed_path: str):
         for row in self.table.all_rows:
@@ -214,25 +281,36 @@ class ActivityTab(QWidget):
         if path:
             show_in_folder(path)
 
+    def _copy_bibtex(self):
+        path = self._path()
+        if path:
+            self.ctl.copy_bibtex_for_file(path)
+
     def _undo(self):
         row = self.table.current()
         if row is None or not row.get("undoable"):
             self.ctl.status("This row is not a rename that can be undone.")
             return
         path = row["path"]
-        self.ctl.worker.call(lambda w: w.engine.undo_path(path), self.ctl.after_undo, self.ctl.error)
+        self.ctl.worker.call(
+            lambda w: w.engine.undo_path(path), self.ctl.after_undo, self.ctl.error
+        )
 
     def _refresh(self):
         path = self._existing()
         if path:
             self.ctl.status(f"Refreshing metadata for {short(path)}...")
-            self.ctl.worker.call(lambda w: w.engine.refresh(path),
-                                 lambda result: self.ctl.status(f"{short(str(result.path))}: "
-                                                                f"{result.message or result.status}"),
-                                 self.ctl.error)
+            self.ctl.worker.call(
+                lambda w: w.engine.refresh(path),
+                lambda result: self.ctl.status(
+                    f"{short(str(result.path))}: {result.message or result.status}"
+                ),
+                self.ctl.error,
+            )
 
 
 # Needs attention ------------------------------------------------------------------
+
 
 class AttentionTab(QWidget):
     def __init__(self, ctl):
@@ -242,18 +320,28 @@ class AttentionTab(QWidget):
         self.summary = QLabel("Nothing needs attention.")
         layout.addWidget(self.summary)
         self.table = PagedTable(
-            [("File", lambda r: short(r["display_path"])),
-             ("Status", lambda r: FILE_STATUS.get(r["status"], r["status"])),
-             ("Reason", lambda r: REASONS.get(r["status"], "")),
-             ("Folder", lambda r: os.path.dirname(r["display_path"]))],
-            name="Files needing attention", search_text=lambda r: r["display_path"],
+            [
+                ("File", lambda r: short(r["display_path"])),
+                ("Status", lambda r: FILE_STATUS.get(r["status"], r["status"])),
+                ("Reason", lambda r: REASONS.get(r["status"], "")),
+                ("Folder", lambda r: os.path.dirname(r["display_path"])),
+            ],
+            name="Files needing attention",
+            search_text=lambda r: r["display_path"],
             statuses=[FILE_STATUS[key] for key in ("check", "unknown", "pending", "unreadable")],
-            status_of=lambda r: FILE_STATUS.get(r["status"], r["status"]))
+            status_of=lambda r: FILE_STATUS.get(r["status"], r["status"]),
+        )
         for column, width in enumerate((320, 150, 360)):
             self.table.view.setColumnWidth(column, width)
-        self.table.set_actions([("Open file", self._open), ("Enter DOI...", self._doi),
-                                ("Edit details...", self._edit), ("Retry now", self._retry),
-                                ("Ignore (never ask again)", self._ignore)])
+        self.table.set_actions(
+            [
+                ("Open file", self._open),
+                ("Enter DOI...", self._doi),
+                ("Edit details...", self._edit),
+                ("Retry now", self._retry),
+                ("Ignore (never ask again)", self._ignore),
+            ]
+        )
         self.table.selection_changed.connect(self._update_buttons)
         layout.addWidget(self.table)
         row = QHBoxLayout()
@@ -262,9 +350,13 @@ class AttentionTab(QWidget):
         self.retry_button = QPushButton("Retr&y now")
         self.ignore_button = QPushButton("&Ignore (never ask again)")
         self.open_button = QPushButton("&Open file")
-        for button, slot in ((self.doi_button, self._doi), (self.edit_button, self._edit),
-                             (self.retry_button, self._retry), (self.ignore_button, self._ignore),
-                             (self.open_button, self._open)):
+        for button, slot in (
+            (self.doi_button, self._doi),
+            (self.edit_button, self._edit),
+            (self.retry_button, self._retry),
+            (self.ignore_button, self._ignore),
+            (self.open_button, self._open),
+        ):
             button.clicked.connect(slot)
             row.addWidget(button)
         self.hint = QLabel("Select a file to fix it (or right-click it).")
@@ -276,7 +368,9 @@ class AttentionTab(QWidget):
 
     def show_rows(self, rows: list[dict]):
         self.table.set_rows(rows)
-        self.summary.setText(f"{len(rows)} file(s) need attention." if rows else "Nothing needs attention.")
+        self.summary.setText(
+            f"{len(rows)} file(s) need attention." if rows else "Nothing needs attention."
+        )
         self._update_buttons()
 
     def _current(self):
@@ -307,12 +401,14 @@ class AttentionTab(QWidget):
         path = self._fixable()
         if not path:
             return
-        doi, ok = QInputDialog.getText(self, "Enter DOI", f"DOI for {short(path)} (e.g. 10.1016/j.aap.2025.108048):")
+        doi, ok = QInputDialog.getText(
+            self, "Enter DOI", f"DOI for {short(path)} (e.g. 10.1016/j.aap.2025.108048):"
+        )
         if ok and doi.strip():
             doi = doi.strip()
             for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "doi:"):
                 if doi.lower().startswith(prefix):
-                    doi = doi[len(prefix):]
+                    doi = doi[len(prefix) :]
             self.ctl.worker.call(lambda w: w.engine.fix(path, doi=doi), self._done, self.ctl.error)
 
     def _edit(self):
@@ -347,6 +443,7 @@ class AttentionTab(QWidget):
 
 # Folders --------------------------------------------------------------------------
 
+
 class FoldersTab(QWidget):
     def __init__(self, ctl):
         super().__init__()
@@ -361,8 +458,12 @@ class FoldersTab(QWidget):
         self.table.setToolTip("Double-click a folder to open it")
         inner.addWidget(self.table)
         row = QHBoxLayout()
-        for text, slot in (("&Add folder...", self._add), ("&Remove", self._remove),
-                           ("Show in &Explorer", self._reveal), ("Re&check", self.refresh_states)):
+        for text, slot in (
+            ("&Add folder...", self._add),
+            ("&Remove", self._remove),
+            ("Show in &Explorer", self._reveal),
+            ("Re&check", self.refresh_states),
+        ):
             button = QPushButton(text)
             button.clicked.connect(slot)
             row.addWidget(button)
@@ -403,8 +504,13 @@ class FoldersTab(QWidget):
             toggle.setCheckState(Qt.Checked if folder["recursive"] else Qt.Unchecked)
             self.table.setItem(index, 1, toggle)
             state = self.states.get(folder["path"])
-            self.table.setItem(index, 2, _item("Checking..." if state is None else
-                                               ("Reachable" if state else "UNREACHABLE")))
+            self.table.setItem(
+                index,
+                2,
+                _item(
+                    "Checking..." if state is None else ("Reachable" if state else "UNREACHABLE")
+                ),
+            )
         self.table.blockSignals(False)
         self.excludes.clear()
         self.excludes.addItems(config["exclude"])
@@ -428,9 +534,11 @@ class FoldersTab(QWidget):
         recursive = item.checkState() == Qt.Checked
         config = copy.deepcopy(self.ctl.config)
         config["folders"] = [folder for folder in config["folders"] if folder["path"] != path]
-        self.ctl.worker.call(lambda w: w.validate_new_folder(config, path, recursive),
-                             lambda info: self.ctl.save_settings(info["config"]),
-                             lambda message: (self.ctl.error(message), self.show_config(self.ctl.config)))
+        self.ctl.worker.call(
+            lambda w: w.validate_new_folder(config, path, recursive),
+            lambda info: self.ctl.save_settings(info["config"]),
+            lambda message: (self.ctl.error(message), self.show_config(self.ctl.config)),
+        )
 
     def _add(self):
         path = QFileDialog.getExistingDirectory(self, "Choose a folder of papers")
@@ -443,8 +551,13 @@ class FoldersTab(QWidget):
 
     def _remove(self):
         path = self._selected_path()
-        if path and QMessageBox.question(self, "Remove folder",
-                                         f"Stop watching {path}?\nFiles there keep their names.") == QMessageBox.Yes:
+        if (
+            path
+            and QMessageBox.question(
+                self, "Remove folder", f"Stop watching {path}?\nFiles there keep their names."
+            )
+            == QMessageBox.Yes
+        ):
             config = copy.deepcopy(self.ctl.config)
             config["folders"] = [folder for folder in config["folders"] if folder["path"] != path]
             self.ctl.save_settings(config)
@@ -484,6 +597,7 @@ class FoldersTab(QWidget):
 
 
 # Naming ---------------------------------------------------------------------------
+
 
 class NamingTab(QWidget):
     def __init__(self, ctl):
@@ -540,10 +654,15 @@ class NamingTab(QWidget):
         row.addWidget(self.revert_button)
         row.addWidget(self.save_button)
         layout.addLayout(row)
-        layout.addWidget(QLabel("Saving never renames existing files by itself; you are asked first."))
-        for signal in (self.preset.currentIndexChanged, self.template.textChanged,
-                       self.separator.currentIndexChanged,
-                       self.year.currentIndexChanged):
+        layout.addWidget(
+            QLabel("Saving never renames existing files by itself; you are asked first.")
+        )
+        for signal in (
+            self.preset.currentIndexChanged,
+            self.template.textChanged,
+            self.separator.currentIndexChanged,
+            self.year.currentIndexChanged,
+        ):
             signal.connect(self._changed)
         ctl.config_changed.connect(self.show_config)
 
@@ -552,13 +671,23 @@ class NamingTab(QWidget):
         for widget in widgets:
             widget.blockSignals(True)
         fmt = config["format"]
-        preset = fmt if fmt in PRESETS else next(
-            (name for name, (template, sep) in PRESETS.items()
-             if template == fmt and sep == config["word_sep"] and name != "citekey"), None)
+        preset = (
+            fmt
+            if fmt in PRESETS
+            else next(
+                (
+                    name
+                    for name, (template, sep) in PRESETS.items()
+                    if template == fmt and sep == config["word_sep"] and name != "citekey"
+                ),
+                None,
+            )
+        )
         self.preset.setCurrentIndex(self.preset.findData(preset))
         self.template.setText(PRESETS[preset][0] if preset else fmt)
-        self.separator.setCurrentIndex(max(0, self.separator.findData(
-            PRESETS[preset][1] if preset else config["word_sep"])))
+        self.separator.setCurrentIndex(
+            max(0, self.separator.findData(PRESETS[preset][1] if preset else config["word_sep"]))
+        )
         self.year.setCurrentIndex(self.year.findData(config["year"]))
         for widget in widgets:
             widget.blockSignals(False)
@@ -583,9 +712,16 @@ class NamingTab(QWidget):
         self.separator.setEnabled(custom)
         try:
             warnings = [] if not custom else validate_template(self.template.text())
-            lines = [build_name(paper, preset or self.template.text(), ".",
-                                word_sep=self.separator.currentData(), year_mode=self.year.currentData())
-                     for paper in SAMPLE_PAPERS]
+            lines = [
+                build_name(
+                    paper,
+                    preset or self.template.text(),
+                    ".",
+                    word_sep=self.separator.currentData(),
+                    year_mode=self.year.currentData(),
+                )
+                for paper in SAMPLE_PAPERS
+            ]
         except (TemplateError, ValueError) as exc:
             self.message.setText(f"Error: {exc}. This template cannot be saved.")
             self.preview.setText("")
@@ -600,8 +736,14 @@ class NamingTab(QWidget):
     def _current(self) -> tuple:
         config = self.ctl.config
         fmt = config["format"]
-        same = next((name for name, (template, sep) in PRESETS.items()
-                     if template == fmt and sep == config["word_sep"] and name != "citekey"), None)
+        same = next(
+            (
+                name
+                for name, (template, sep) in PRESETS.items()
+                if template == fmt and sep == config["word_sep"] and name != "citekey"
+            ),
+            None,
+        )
         fmt = same or fmt
         sep = PRESETS[fmt][1] if fmt in PRESETS else config["word_sep"]
         return (fmt, sep, config["year"])
@@ -624,6 +766,7 @@ class NamingTab(QWidget):
 
 
 # Sources --------------------------------------------------------------------------
+
 
 class SourcesTab(QWidget):
     def __init__(self, ctl):
@@ -656,17 +799,26 @@ class SourcesTab(QWidget):
         row.addWidget(test)
         form.addRow(_buddy("Semantic &Scholar key", self.s2), row)
         self.email = QLineEdit()
-        self.email.setPlaceholderText("you@example.org (sent to Crossref for faster, polite access)")
+        self.email.setPlaceholderText(
+            "you@example.org (sent to Crossref for faster, polite access)"
+        )
         form.addRow("&Email", self.email)
         self.title_search = QCheckBox("Search by &title when a PDF has no DOI or arXiv id")
         form.addRow("", self.title_search)
-        form.addRow("", QLabel("Privacy: when on, a paper's title may be sent to Crossref, OpenAlex and "
-                               "Semantic Scholar. When off, only DOIs and arXiv ids are looked up."))
+        form.addRow(
+            "",
+            QLabel(
+                "Privacy: when on, a paper's title may be sent to Crossref, OpenAlex and "
+                "Semantic Scholar. When off, only DOIs and arXiv ids are looked up."
+            ),
+        )
         store = SecretStore(ctl.home)
-        self.key_store = QLabel(f"Keys are kept in {store.describe()}, not in the settings file."
-                                if store.available() else
-                                "No system credential store was found, so keys are kept in the settings "
-                                "file, readable only by you.")
+        self.key_store = QLabel(
+            f"Keys are kept in {store.describe()}, not in the settings file."
+            if store.available()
+            else "No system credential store was found, so keys are kept in the settings "
+            "file, readable only by you."
+        )
         self.key_store.setWordWrap(True)
         form.addRow("", self.key_store)
         layout.addLayout(form)
@@ -693,15 +845,23 @@ class SourcesTab(QWidget):
 
     def _edited(self) -> dict:
         config = copy.deepcopy(self.ctl.config)
-        config.update({"openalex_key": self.openalex.text().strip(), "s2_key": self.s2.text().strip(),
-                       "email": self.email.text().strip(), "title_search": self.title_search.isChecked()})
+        config.update(
+            {
+                "openalex_key": self.openalex.text().strip(),
+                "s2_key": self.s2.text().strip(),
+                "email": self.email.text().strip(),
+                "title_search": self.title_search.isChecked(),
+            }
+        )
         return config
 
     def _save(self):
         self.ctl.save_settings(self._edited(), lambda _: self.ctl.status("Sources saved."))
 
     def show_rejected(self, message: str | None):
-        self.banner.setText(f"Key problem: {message}. Other sources keep working." if message else "")
+        self.banner.setText(
+            f"Key problem: {message}. Other sources keep working." if message else ""
+        )
         self.banner.setVisible(bool(message))
 
     def _test(self, services):
@@ -720,7 +880,9 @@ class SourcesTab(QWidget):
         for result in results:
             index = self.results.rowCount()
             self.results.insertRow(index)
-            for column, text in enumerate((result.status, " ".join(result.label.split()), result.detail)):
+            for column, text in enumerate(
+                (result.status, " ".join(result.label.split()), result.detail)
+            ):
                 self.results.setItem(index, column, _item(text))
         if any(result.status == "FAIL" and "key rejected" in result.detail for result in results):
             self.show_rejected("a key was rejected by its service")
@@ -728,20 +890,48 @@ class SourcesTab(QWidget):
 
 # History --------------------------------------------------------------------------
 
+
 class HistoryTab(QWidget):
     def __init__(self, ctl):
         super().__init__()
         self.ctl = ctl
         layout = QVBoxLayout(self)
+        filter_row = QHBoxLayout()
+        search_label = QLabel("Sea&rch:")
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Filter history by file name or source...")
+        self.search.setClearButtonEnabled(True)
+        search_label.setBuddy(self.search)
+        self.search.textChanged.connect(lambda _: self._refilter())
+        filter_row.addWidget(search_label)
+        filter_row.addWidget(self.search, 1)
+
+        filter_label = QLabel("Fi&lter:")
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("All statuses", None)
+        for st in ("Renamed", "Check", "Undone"):
+            self.status_filter.addItem(st, st.lower())
+        self.status_filter.currentIndexChanged.connect(lambda _: self._refilter())
+        filter_label.setBuddy(self.status_filter)
+        filter_row.addWidget(filter_label)
+        filter_row.addWidget(self.status_filter)
+        layout.addLayout(filter_row)
+
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["When / old name", "New name", "Source", "Status"])
         self.tree.setColumnWidth(0, 380)
         self.tree.setColumnWidth(1, 460)
         self.tree.setAccessibleName("Rename history grouped by batch")
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._context_menu)
         layout.addWidget(self.tree)
         row = QHBoxLayout()
-        for text, slot in (("&Undo selected (row or whole batch)", self._undo),
-                           ("&Export CSV...", self._export), ("&Reload", self.reload)):
+        for text, slot in (
+            ("&Undo selected (row or whole batch)", self._undo),
+            ("Copy &BibTeX", self._copy_bibtex),
+            ("&Export CSV...", self._export),
+            ("&Reload", self.reload),
+        ):
             button = QPushButton(text)
             button.clicked.connect(slot)
             row.addWidget(button)
@@ -751,6 +941,62 @@ class HistoryTab(QWidget):
 
     def reload(self):
         self.ctl.worker.call(lambda w: w.recent_history(5000), self.show_rows)
+
+    def _context_menu(self, pos):
+        item = self.tree.itemAt(pos)
+        if not item or not item.parent():
+            return
+        menu = QMenu(self)
+        menu.addAction("Copy BibTeX citation", self._copy_bibtex)
+        menu.addAction("Show in folder", self._reveal)
+        menu.addAction("Undo this rename", self._undo)
+        menu.exec(self.tree.viewport().mapToGlobal(pos))
+
+    def _reveal(self):
+        item = self.tree.currentItem()
+        if not item or not item.parent():
+            return
+        path = item.toolTip(1) or item.toolTip(0)
+        if path:
+            show_in_folder(path)
+
+    def _copy_bibtex(self):
+        item = self.tree.currentItem()
+        if not item or not item.parent():
+            self.ctl.status("Select a specific rename to copy its BibTeX citation.")
+            return
+        path = item.toolTip(1) or item.toolTip(0)
+        self.ctl.copy_bibtex_for_file(path)
+
+    def _refilter(self):
+        query = self.search.text().lower().strip()
+        status_sel = self.status_filter.currentData()
+        for i in range(self.tree.topLevelItemCount()):
+            parent = self.tree.topLevelItem(i)
+            visible_children = 0
+            for j in range(parent.childCount()):
+                child = parent.child(j)
+                old_text = child.toolTip(0).lower()
+                new_text = child.toolTip(1).lower()
+                source_text = child.text(2).lower()
+                child_status = child.text(3).lower()
+                matches_search = (
+                    not query or query in old_text or query in new_text or query in source_text
+                )
+                matches_status = (
+                    status_sel is None
+                    or (status_sel == "renamed" and child_status in ("ok", "renamed"))
+                    or (child_status == status_sel)
+                )
+                visible = matches_search and matches_status
+                child.setHidden(not visible)
+                if visible:
+                    visible_children += 1
+            parent.setHidden(visible_children == 0)
+            if query and visible_children > 0:
+                parent.setExpanded(True)
+            elif not query:
+                parent.setExpanded(False)
 
     def show_rows(self, rows: list[dict]):
         self.tree.clear()
@@ -764,7 +1010,9 @@ class HistoryTab(QWidget):
                 live[row["batch"]] = []
                 self.tree.addTopLevelItem(parent)
             status = "undone" if row["undone"] else row["status"]
-            child = QTreeWidgetItem([short(row["old_path"]), short(row["new_path"]), row["source"], status])
+            child = QTreeWidgetItem(
+                [short(row["old_path"]), short(row["new_path"]), row["source"], status]
+            )
             child.setToolTip(0, row["old_path"])
             child.setToolTip(1, row["new_path"])
             child.setData(0, Qt.UserRole, [row["id"]] if not row["undone"] else [])
@@ -774,8 +1022,12 @@ class HistoryTab(QWidget):
         for batch, parent in batches.items():
             ids = live[batch]
             parent.setData(0, Qt.UserRole, ids)
-            parent.setText(0, f"{parent.text(0)}: {parent.childCount()} rename(s)"
-                              + ("" if ids else ", all undone"))
+            parent.setText(
+                0,
+                f"{parent.text(0)}: {parent.childCount()} rename(s)"
+                + ("" if ids else ", all undone"),
+            )
+        self._refilter()
 
     def _undo(self):
         item = self.tree.currentItem()
@@ -786,14 +1038,19 @@ class HistoryTab(QWidget):
         self.ctl.worker.call(lambda w: w.engine.undo_ids(ids), self.ctl.after_undo, self.ctl.error)
 
     def _export(self):
-        target, _ = QFileDialog.getSaveFileName(self, "Export history", "papernym-history.csv", "CSV (*.csv)")
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Export history", "papernym-history.csv", "CSV (*.csv)"
+        )
         if target:
-            self.ctl.worker.call(lambda w: w.export_history(target),
-                                 lambda count: self.ctl.status(f"Exported {count} rows to {target}"),
-                                 self.ctl.error)
+            self.ctl.worker.call(
+                lambda w: w.export_history(target),
+                lambda count: self.ctl.status(f"Exported {count} rows to {target}"),
+                self.ctl.error,
+            )
 
 
 # General --------------------------------------------------------------------------
+
 
 class GeneralTab(QWidget):
     def __init__(self, ctl):
@@ -811,7 +1068,11 @@ class GeneralTab(QWidget):
             self.login.setToolTip("Disabled in sandbox mode")
         theme_row = QHBoxLayout()
         self.theme = QComboBox()
-        for text, value in (("System (follow Windows)", "system"), ("Light", "light"), ("Dark", "dark")):
+        for text, value in (
+            ("System (follow Windows)", "system"),
+            ("Light", "light"),
+            ("Dark", "dark"),
+        ):
             self.theme.addItem(text, value)
         self.theme.currentIndexChanged.connect(self._save)
         theme_row.addWidget(_buddy("&Theme:", self.theme))
@@ -821,8 +1082,10 @@ class GeneralTab(QWidget):
         grid = QGridLayout()
         buttons = (("Save &diagnostics...", self._save_diagnostics),)
         if ctl.debug:  # the settings folder holds the database; shown only for debugging
-            buttons = (("Open &settings folder", lambda: open_path(ctl.home)),
-                       ("Open &log", self._open_log)) + buttons
+            buttons = (
+                ("Open &settings folder", lambda: open_path(ctl.home)),
+                ("Open &log", self._open_log),
+            ) + buttons
         for column, (text, slot) in enumerate(buttons):
             button = QPushButton(text)
             button.clicked.connect(slot)
@@ -835,8 +1098,11 @@ class GeneralTab(QWidget):
         ctl.config_changed.connect(self.show_config)
 
     def show_config(self, config: dict):
-        for box, key in ((self.login, "start_at_login"), (self.notify, "notify_on_rename"),
-                         (self.paused, "paused")):
+        for box, key in (
+            (self.login, "start_at_login"),
+            (self.notify, "notify_on_rename"),
+            (self.paused, "paused"),
+        ):
             box.blockSignals(True)
             box.setChecked(config[key])
             box.blockSignals(False)
@@ -847,9 +1113,14 @@ class GeneralTab(QWidget):
     def _save(self):
         config = copy.deepcopy(self.ctl.config)
         login_changed = config["start_at_login"] != self.login.isChecked()
-        config.update({"start_at_login": self.login.isChecked(),
-                       "notify_on_rename": self.notify.isChecked(), "paused": self.paused.isChecked(),
-                       "theme": self.theme.currentData()})
+        config.update(
+            {
+                "start_at_login": self.login.isChecked(),
+                "notify_on_rename": self.notify.isChecked(),
+                "paused": self.paused.isChecked(),
+                "theme": self.theme.currentData(),
+            }
+        )
         if login_changed:
             self.ctl.set_start_at_login(self.login.isChecked())
         self.ctl.save_settings(config)
@@ -858,7 +1129,9 @@ class GeneralTab(QWidget):
         """A copy of the log with keys and email addresses masked, saved where the user chooses."""
         source = log_path(self.ctl.home)
         start = str(Path.home() / "Documents" / "papernym-diagnostics.txt")
-        target, _ = QFileDialog.getSaveFileName(self, "Save diagnostics", start, "Text files (*.txt)")
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Save diagnostics", start, "Text files (*.txt)"
+        )
         if not target:
             return
         text = source.read_text(encoding="utf-8", errors="replace") if source.exists() else ""
@@ -883,6 +1156,7 @@ def mask_diagnostics(text: str, home: Path) -> str:
 
 # About ----------------------------------------------------------------------------
 
+
 class AboutTab(QWidget):
     def __init__(self, ctl):
         super().__init__()
@@ -894,22 +1168,32 @@ class AboutTab(QWidget):
         logo.setAccessibleName("PaperNym logo")
         top.addWidget(logo, 0, Qt.AlignTop)
         title = QVBoxLayout()
-        name = QLabel(f"<span style='font-size:20pt; font-weight:600'>PaperNym</span>"
-                      f"&nbsp;&nbsp;version {__version__}")
+        name = QLabel(
+            f"<span style='font-size:20pt; font-weight:600'>PaperNym</span>"
+            f"&nbsp;&nbsp;version {__version__}"
+        )
         title.addWidget(name)
-        title.addWidget(QLabel("Names your research papers automatically: it watches your folders, "
-                               "looks each PDF up in scholarly databases, and renames it the way you choose."))
+        title.addWidget(
+            QLabel(
+                "Names your research papers automatically: it watches your folders, "
+                "looks each PDF up in scholarly databases, and renames it the way you choose."
+            )
+        )
         top.addLayout(title, 1)
         layout.addLayout(top)
         links = QFormLayout()
-        for label, text, url in (("Developer", "Xatta-Trone on GitHub", updates.DEVELOPER_URL),
-                                 ("Project", "github.com/" + updates.REPO, updates.PROJECT_URL),
-                                 ("Report a problem", "Open an issue", updates.ISSUES_URL),
-                                 ("Licence", "MIT License", updates.LICENSE_URL)):
+        for label, text, url in (
+            ("Developer", "Xatta-Trone on GitHub", updates.DEVELOPER_URL),
+            ("Project", "github.com/" + updates.REPO, updates.PROJECT_URL),
+            ("Report a problem", "Open an issue", updates.ISSUES_URL),
+            ("Licence", "MIT License", updates.LICENSE_URL),
+        ):
             links.addRow(label, LinkLabel(text, url))
         layout.addLayout(links)
-        credits = QLabel("Paper details come from Crossref, OpenAlex, Semantic Scholar, arXiv and doi.org. "
-                         "PaperNym is not affiliated with these services.")
+        credits = QLabel(
+            "Paper details come from Crossref, OpenAlex, Semantic Scholar, arXiv and doi.org. "
+            "PaperNym is not affiliated with these services."
+        )
         credits.setWordWrap(True)
         layout.addWidget(credits)
         layout.addSpacing(12)
@@ -928,8 +1212,10 @@ class AboutTab(QWidget):
         row.addWidget(self.download_button)
         row.addStretch(1)
         layout.addLayout(row)
-        self.auto = QCheckBox("Check for updates &automatically (once a day; only the version number "
-                              "is fetched from GitHub)")
+        self.auto = QCheckBox(
+            "Check for updates &automatically (once a day; only the version number "
+            "is fetched from GitHub)"
+        )
         self.auto.toggled.connect(self._save)
         layout.addWidget(self.auto)
         layout.addStretch(1)
@@ -959,10 +1245,11 @@ class AboutTab(QWidget):
         self._url = info.url
         self.download_button.setVisible(info.newer)
         if info.newer:
-            self.update_status.setText(f"Version {info.latest} is available (you have {info.current}). "
-                                       f"{updates.how_to_update()}")
+            self.update_status.setText(
+                f"Version {info.latest} is available (you have {info.current}). "
+                f"{updates.how_to_update()}"
+            )
         elif info.latest:
             self.update_status.setText(f"PaperNym {info.current} is up to date. Checked {stamp}.")
         else:
             self.update_status.setText(f"No release has been published yet. Checked {stamp}.")
-

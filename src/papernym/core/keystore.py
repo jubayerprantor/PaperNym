@@ -93,8 +93,10 @@ class SecretStore:
         if self.backend is None:
             return "config.json (no system credential store found)"
         module = type(self.backend).__module__
-        return next((name for prefix, name in _MODULE_NAMES.items() if module.startswith(prefix)),
-                    type(self.backend).__name__)
+        return next(
+            (name for prefix, name in _MODULE_NAMES.items() if module.startswith(prefix)),
+            type(self.backend).__name__,
+        )
 
     def get(self, name: str) -> str:
         if self.backend is None:
